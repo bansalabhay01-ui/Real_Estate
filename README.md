@@ -1,1 +1,107 @@
-# Real_Estate
+# LeadOps
+
+LeadOps finds the genuine buyers among a real estate website's visitors. One script tag tracks every visitor,
+bots and junk enquiries get filtered out (scoring arrives in Week 2), and the sales team watches visitors arrive
+live, with the buyer details the assistant picked up.
+
+This is the Week 1 foundation from [LEADOPS_PLAN.md](LEADOPS_PLAN.md): a demo property site, the tracking SDK,
+the event API, a basic property assistant, a live sales dashboard and a traffic simulator.
+
+## What's where
+
+| Folder | What it holds | Owner |
+|---|---|---|
+| `frontend/` | React demo site (`/`, `/property/:id`) and the sales dashboard (`/dashboard`) | A |
+| `sdk/` | `leadops.js`, the tracking script, and `demo.html`, a plain page that uses it | A |
+| `backend/app/` | FastAPI: events, listings, enquiries, chat, feedback, dashboard WebSocket | B |
+| `backend/app/ai/` | LLM wrapper, buyer-detail extraction, listing search, the assistant | C |
+| `backend/app/scoring/` | the scoring engine (Week 2) | B |
+| `backend/data/` | `listings.json`: 18 fictional homes in 5 cities | everyone |
+| `ml/` | `simulator.py`: labelled bot / junk / genuine traffic | B |
+| `docs/CONTRACTS.md` | the shared JSON contracts; read it before changing an API | everyone |
+
+## Run it
+
+You need Python 3.11 or newer and Node 20 or newer (tested with Python 3.14 and Node 24).
+
+**Backend** (first terminal), on Windows PowerShell:
+
+```powershell
+cd backend
+python -m venv .venv
+.venv\Scripts\python -m pip install -r requirements.txt
+copy .env.example .env          # optional: paste an LLM key into .env
+.venv\Scripts\python -m uvicorn app.main:app --reload
+```
+
+On Mac or Linux:
+
+```bash
+cd backend
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+cp .env.example .env
+.venv/bin/python -m uvicorn app.main:app --reload
+```
+
+The API runs at http://localhost:8000, with interactive docs at http://localhost:8000/docs.
+
+**Frontend** (second terminal):
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open http://localhost:5173 for the demo site and http://localhost:5173/dashboard for the sales dashboard.
+
+## Try it
+
+1. Open the dashboard in one window and the demo site in another, then browse. You appear on the dashboard within
+   seconds; click your row to see your pages, scrolls and clicks in order.
+2. Open http://localhost:8000/sdk/demo.html, a plain HTML page with the same script tag. That visit appears too.
+   To show it working on a different website, serve it from another address:
+   `python -m http.server 5500 --directory sdk`, then open http://localhost:5500/demo.html.
+3. Ask the assistant "3BHK under 90L in Pune?" or "Pune mein 90 lakh tak 3BHK chahiye". It answers from the
+   listings and saves the budget, BHK and city on the visitor.
+4. Send an enquiry from a property page. The dashboard shows how fast the form was filled in and whether the
+   hidden honeypot field was filled.
+5. Send simulated traffic: `python ml/simulator.py --send http://localhost:8000 --bots 20 --junk 5 --genuine 10`
+
+## Simulator
+
+`python ml/simulator.py` writes 500 labelled sessions (200 bot, 100 junk, 200 genuine) to `ml/data/sessions.jsonl`
+for Week 2 training. The same `--seed` gives the same data. `--send URL` also posts the sessions to a running
+backend. `--chat` sends their chat messages too, which calls your LLM if a key is set.
+
+## Tests
+
+```bash
+cd backend
+.venv\Scripts\python -m pytest        # Mac/Linux: .venv/bin/python -m pytest
+```
+
+The tests use a temporary database and never call a real LLM. The Claude request shape is checked offline.
+
+## The LLM (optional)
+
+The assistant works without a key, answering from templates. To use an LLM, put one key in `backend/.env`:
+`ANTHROPIC_API_KEY` (Claude; the default model is `claude-opus-5-5`, and `LLM_MODEL=claude-haiku-5-5` costs much
+less), `GEMINI_API_KEY` or `GROQ_API_KEY`. `GET /health` shows which one is in use. If a call fails, the assistant
+falls back to templates, so a demo never breaks. Phone numbers and emails are masked before text reaches an LLM.
+
+## Team
+
+| Member | Owns |
+|---|---|
+| A, Frontend | demo site, SDK, chat widget, smart-trigger UI, dashboard, live feed, analytics charts |
+| B, Backend + ML | FastAPI, database, event ingestion, rules, features, simulator, Playwright bots, ML + SHAP, WebSocket, feedback loop |
+| C, GenAI | LLM wrapper, RAG, LangGraph agent, multilingual replies, JSON extraction, visitor-type classification, consistency check, explanations, follow-ups |
+
+## Notes
+
+- Settings live in `backend/.env`, which is never committed. New settings go into `backend/.env.example` first.
+- `backend/leadops.db` is the local SQLite database. Delete it (with the backend stopped) to start fresh.
+- This folder is inside OneDrive. `node_modules` and `.venv` hold thousands of files, so pause OneDrive syncing
+  while installing if it gets slow.

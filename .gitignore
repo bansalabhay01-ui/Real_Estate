@@ -1,0 +1,59 @@
+# LeadOps: files git must never commit.
+
+# ---- Secrets ----
+# Real settings and API keys. Only the .env.example templates are committed.
+.env
+.env.*
+!.env.example
+*.pem
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ---- Node / React ----
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+npm-debug.log*
+
+# ---- Local data ----
+# SQLite database used while developing, and its side files
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+*.sqlite
+*.sqlite3
+# Simulator output: regenerate with `python ml/simulator.py` (same --seed, same data)
+ml/data/
+
+# ---- Logs ----
+*.log
+logs/
+
+# ---- Playwright (ml/bots) ----
+test-results/
+playwright-report/
+playwright/.cache/
+
+# ---- Claude Code: personal files ----
+# CLAUDE.md and .claude/settings.json are shared with the team, so they ARE committed.
+.claude/settings.local.json
+CLAUDE.local.md
+
+# ---- OS and editors ----
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/

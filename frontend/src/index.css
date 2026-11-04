@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+/* LeadOps Realty tokens. The one bold element is the blueprint floor plan; everything else stays quiet. */
+@theme {
+  --font-sans: "Archivo", "Noto Sans Devanagari", ui-sans-serif, system-ui, sans-serif;
+
+  --color-ink: #17212b; /* drafting ink: text */
+  --color-ink-soft: #3b4652;
+  --color-muted: #5b6773; /* secondary text, 5:1 on concrete */
+  --color-concrete: #f3f5f6; /* page background */
+  --color-line: #d9dee3; /* borders */
+  --color-blueprint: #1d4f91; /* floor plans, links, focus */
+  --color-blueprint-deep: #163d70;
+  --color-blueprint-line: #e6effa;
+  --color-marigold: #f2a20c; /* main actions (ink text on it); too light for marks on white */
+  --color-amber: #9c5a00; /* enquiry markers and "possession" badges */
+  --color-alert: #b4232a; /* bot signals */
+  --color-ok: #1e7a4c; /* ready to move */
+}
+
+@utility font-wide {
+  font-stretch: 112%;
+}
+@utility font-extra-wide {
+  font-stretch: 125%;
+}
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@layer base {
+  html {
+    color: var(--color-ink);
+    background: var(--color-concrete);
+  }
+  body {
+    font-family: var(--font-sans);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1,
+  h2,
+  h3 {
+    line-height: 1.15;
+    text-wrap: balance;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-blueprint);
+    outline-offset: 2px;
+  }
+}
+
+/* The hero floor plan draws itself once: walls first, then the room names. */
+@keyframes plan-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes plan-fade {
+  to {
+    opacity: 1;
+  }
+}
+.plan-animate .plan-wall {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: plan-draw 1.1s ease-in-out forwards;
+}
+.plan-animate .plan-label {
+  opacity: 0;
+  animation: plan-fade 0.5s ease-out 1.6s forwards;
+}
+
+/* A dashboard row that just changed. */
+@keyframes row-flash {
+  from {
+    background-color: #fdeccb;
+  }
+  to {
+    background-color: transparent;
+  }
+}
+.row-flash {
+  animation: row-flash 2.4s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plan-animate .plan-wall,
+  .plan-animate .plan-label,
+  .row-flash {
+    animation: none;
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
