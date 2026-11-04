@@ -62,3 +62,8 @@ Every prompt typed to Claude Code in this project is added below automatically, 
 ### 2026-11-04 23:23 · bansalabhay01-ui
 
 > yes i want to make you commit this project after every session
+
+### 2026-11-04 23:39 · bansalabhay01-ui
+
+> you only by yourself have to make the session according to you and before creating new session just save the context of the previous session and commit it to the github 
+> the link of the github repo is:https://github.com/bansalabhay01-ui/Real_Estate.git

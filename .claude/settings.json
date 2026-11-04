@@ -21,6 +21,17 @@
     ]
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"try { const lines = require('child_process').execSync('git status --short', { encoding: 'utf8', cwd: process.env.CLAUDE_PROJECT_DIR || '.', stdio: ['ignore', 'pipe', 'ignore'] }).split('\\n').filter((line) => line.trim() && !line.endsWith('PROMPTS.md')); if (lines.length) console.log('The last session was not saved. Before new work, save it with the wrap-up skill (SESSION_LOG.md, commit, push). Unsaved files:\\n' + lines.join('\\n')); } catch (error) {}\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
     "UserPromptSubmit": [
       {
         "hooks": [

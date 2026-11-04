@@ -4,10 +4,12 @@ GenAI lead qualification for real estate websites. LeadOps scores every visitor,
 
 The full plan, features and timeline are in `LEADOPS_PLAN.md`. Read it before any large change.
 
-## Every session
-- At the start, read the **Current status** block at the top of `SESSION_LOG.md`.
-- At the end, the user runs `/wrap-up` to add a session entry and refresh that status.
-- `PROMPTS.md` is filled automatically by a hook (`.claude/hooks/log-prompt.mjs`). Never edit or reformat it.
+## Sessions (Claude saves them itself)
+A session is one run of Claude Code. Save sessions without being asked:
+- **At the start:** read the **Current status** block at the top of `SESSION_LOG.md`. If the SessionStart hook reports unsaved files, the previous session wasn't saved: save it first (wrap-up skill, working out what it did from `git diff` and the newest `PROMPTS.md` entries), then start the new work.
+- **When a piece of work is finished and checked:** run the wrap-up skill (`.claude/commands/wrap-up.md`): update `SESSION_LOG.md`, commit, and push to GitHub (`origin`, https://github.com/bansalabhay01-ui/Real_Estate, branch `main`). Tell the user in a line what was pushed.
+- Never commit secrets: if the staged files include `.env` files, keys or databases, stop and tell the user.
+- `PROMPTS.md` is filled automatically by a hook (`.claude/hooks/log-prompt.mjs`). Never edit or reformat it; it is committed with each save.
 
 ## Stack
 - **Frontend:** React (Vite) + Tailwind + shadcn/ui + Recharts. One app: demo site at `/`, sales dashboard at `/dashboard`.
