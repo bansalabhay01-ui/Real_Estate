@@ -17,6 +17,8 @@ UTCDateTime = Annotated[datetime, PlainSerializer(iso, return_type=str)]
 # IDs made by the SDK (UUIDs) or the server: letters, digits, '-' and '_' only.
 ClientId = Annotated[str, Field(min_length=8, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")]
 
+TEST_LABELS = ("genuine", "junk", "bot")  # what a tester link can mark a visit as
+
 
 def _clip(limit: int) -> AfterValidator:
     """Cut long text instead of rejecting the whole request (a long page title shouldn't drop a batch)."""
@@ -66,6 +68,17 @@ class ClientContext(BaseModel):
     webdriver: bool | None = None  # true when an automation tool drives the browser
     referrer: Annotated[str | None, _clip(500)] = None
     utm: dict[str, str] | None = None
+    # Only on test sessions opened through a tester link (?lo_test=genuine&lo_tester=t01). Scoring never reads
+    # them; ml/train.py uses them to build the real test set.
+    test_label: str | None = None  # genuine / junk / bot
+    tester: Annotated[str | None, _clip(40)] = None  # a tester code, not a name
+
+    @field_validator("test_label", mode="before")
+    @classmethod
+    def _known_test_label(cls, value: Any) -> str | None:
+        """An unknown label is dropped rather than rejected, so a mistyped link never loses a batch."""
+        label = value.strip().lower() if isinstance(value, str) else None
+        return label if label in TEST_LABELS else None
 
 
 _EVENT_TYPE_JUNK = re.compile(r"[^a-z0-9_.:-]+")
@@ -120,6 +133,7 @@ class VisitorOut(BaseModel):
     automation_hints: list[str]  # raw bot signals, e.g. "webdriver"
     profile: dict[str, Any]  # buyer details from chat
     label: str | None = None  # Bot / Junk / Cold / Warm / Hot / Review, set by the scoring engine (Week 2)
+    test_label: str | None = None  # genuine / junk / bot on test sessions from a tester link
 
 
 class StatsOut(BaseModel):

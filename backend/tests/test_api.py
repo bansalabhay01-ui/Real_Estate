@@ -75,6 +75,21 @@ def test_automation_hints(client):
     assert "webdriver" in hints and "no_browser_languages" in hints
 
 
+def test_tester_links_label_test_sessions(client):
+    visitor_id, session_id = new_ids()
+    context = {"webdriver": False, "languages": 2, "test_label": "Genuine", "tester": "t01"}
+    assert send_events(client, visitor_id, session_id, [{"type": "page_view", "path": "/"}], context=context).status_code == 200
+    detail = client.get(f"/visitors/{visitor_id}").json()
+    assert detail["visitor"]["test_label"] == "genuine"
+    assert detail["context"]["tester"] == "t01"
+
+    # A mistyped label is dropped, never rejected: the batch still counts.
+    other_id, other_session = new_ids()
+    response = send_events(client, other_id, other_session, [{"type": "page_view"}], context={"test_label": "maybe"})
+    assert response.status_code == 200
+    assert client.get(f"/visitors/{other_id}").json()["visitor"]["test_label"] is None
+
+
 def test_lead_keeps_honeypot_timing_and_ip(client):
     visitor_id, session_id = new_ids()
     send_events(client, visitor_id, session_id, [{"type": "page_view", "path": "/property/PUN-002"}])

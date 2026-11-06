@@ -1,0 +1,8 @@
+# Extra packages for training the model (ml/train.py) and running the Playwright bots (ml/bots/).
+# Install them into the backend's virtual environment, from the repo root:
+#   backend\.venv\Scripts\python -m pip install -r ml/requirements.txt      (Mac/Linux: backend/.venv/bin/python)
+# The bots drive the Edge or Chrome already installed on Windows. On Mac or Linux, download a browser once:
+#   backend/.venv/bin/python -m playwright install chromium
+-r ../backend/requirements.txt
+scikit-learn==1.9.1
+playwright==1.64.1

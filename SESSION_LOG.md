@@ -5,25 +5,31 @@ A short diary of LeadOps work sessions, newest first. Claude saves each session 
 ## Current status
 _Last updated: 2026-11-06_
 
-- **Phase:** Week 1 (Foundation) is done. Week 2 (Intelligence, 6–13 Nov) is planned and waiting for the go-ahead. Deadline about 30 Nov 2026.
-- **Done:** project setup and the Week 1 foundation: demo property site, tracking SDK, FastAPI backend, a basic property assistant (English, Hinglish, Hindi), the live sales dashboard, the traffic simulator and the shared contracts draft. 36 tests pass. The Week 2 build plan is written ("Week 2 Build Plan" at the end of `LEADOPS_PLAN.md`). Roughly 30% of the whole plan.
-- **Next:** two decisions from the user (are the Week 2 contract additions OK; same Wi-Fi or an early deploy for classmates' test sessions), then build Week 2 in six parts, starting with the tester link (Part 1).
-- **Blocked:** waiting on those two decisions. The assistant's LLM replies haven't been tried with a real API key yet (template replies work).
+- **Phase:** Week 2 (Intelligence, 6–13 Nov) in progress: Part 1 of 6 done. Deadline about 30 Nov 2026.
+- **Done:** the Week 1 foundation (demo property site, tracking SDK, FastAPI backend, a basic property assistant in English, Hinglish and Hindi, the live sales dashboard, the traffic simulator, the shared contracts draft) and the Week 2 build plan ("Week 2 Build Plan" at the end of `LEADOPS_PLAN.md`). Week 2 Part 1: tester links that label real test sessions, and same-Wi-Fi testing. 37 tests pass. Roughly 33% of the whole plan.
+- **Next:** Week 2 Part 2: simulator v2, features and rules. Classmates can start test sessions now (README, "Collecting real test sessions").
+- **Blocked:** nothing. The assistant's LLM replies haven't been tried with a real API key yet (template replies work).
 - **Code:** https://github.com/bansalabhay01-ui/Real_Estate (branch `main`)
 
 ---
 
-## 2026-11-06 · bansalabhay01-ui · Week 2 plan
+## 2026-11-06 · bansalabhay01-ui · Week 2 plan and Part 1 (tester link)
 
 **Done**
-- Wrote the Week 2 build plan as a new section at the end of `LEADOPS_PLAN.md`, for review. It has six parts: tester link for real sessions, simulator v2 + features + rules, LightGBM model + intent score + labels + reasons, dashboard v1 with scores, Playwright bots, and LLM extraction + visitor type. It also lists the contract additions, new files, new packages, changes from the main plan and the checks. Nothing is built yet.
-- A pip dry run (nothing installed) confirmed that LightGBM 4.7, scikit-learn 1.9, Playwright 1.64, LangGraph 1.2 and SHAP 0.54 all have ready-made Windows builds for Python 3.14.
+- Wrote the Week 2 build plan as a new section at the end of `LEADOPS_PLAN.md`. It has six parts: tester link for real sessions, simulator v2 + features + rules, LightGBM model + intent score + labels + reasons, dashboard v1 with scores, Playwright bots, and LLM extraction + visitor type. It also lists the contract additions, new files, new packages, changes from the main plan and the checks.
+- A pip dry run confirmed that LightGBM 4.7, scikit-learn 1.9, Playwright 1.64, LangGraph 1.2 and SHAP 0.54 all have ready-made Windows builds for Python 3.14.
 - Ran `claude doctor`: Claude Code 2.1.319, native install, no issues.
+- **Part 1, tester link:** `sdk/leadops.js` (now 1.1.0) reads `?lo_test=genuine|junk|bot&lo_tester=CODE`, remembers it in the browser and sends it as `context.test_label` / `context.tester`; `?lo_test=off` clears it. The backend keeps it and shows it as `VisitorOut.test_label` (an unknown label is dropped, never rejected). The dashboard shows a "Test" chip. `docs/CONTRACTS.md` and the README ("Collecting real test sessions": tester guide and same-Wi-Fi steps) are updated.
+- The site now looks for the API on port 8000 of the machine that serves the page, unless `VITE_API_URL` is set, so classmates' phones on the same Wi-Fi need no settings.
+- Installed the Week 2 packages: `lightgbm` 4.7.0, `numpy` 2.5.4 and `scipy` 1.18.1 in `backend/requirements.txt`; `scikit-learn` 1.9.1 and `playwright` 1.64.1 in the new `ml/requirements.txt`.
+- Checked: 37 tests pass, the frontend builds, and a headless Edge check of the tester link passed 10/10.
 
 **Next**
-- The user answers the plan's two decisions and says go; Part 1 (tester link) comes first, because collecting real sessions takes calendar time.
+- Part 2: simulator v2, features and rules.
 
 **Notes**
+- The user said "continue" without answering the plan's two decisions, so the plan's recommendations apply: the contract additions as planned (written into `docs/CONTRACTS.md` as each part lands) and same-Wi-Fi testing.
+- Teammates: run `pip install -r requirements.txt` in `backend/` again for the new packages, and `pip install -r ml/requirements.txt` (from the repo root, into the same venv) to train or run the bots.
 - Plan decisions: SHAP values come from LightGBM's own `pred_contrib` (no `shap` package on the server). The LangGraph agent moves to the start of Week 3. Many visitors from one IP, a fast form, a missing SDK or a disposable email never make a visitor `Bot` or `Junk` on their own. International (NRI) phone numbers are allowed.
 - Found while planning: the enquiry form's timer starts at the first change, so browser autofill can make a real buyer look fast. The floor-plan download's scripted `link.click()` happens on a detached link, so the SDK never records it as a scripted click.
 - Edge and Chrome are installed on this laptop, so the Playwright bots need no browser download here.

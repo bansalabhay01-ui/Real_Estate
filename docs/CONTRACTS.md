@@ -52,6 +52,10 @@ Response: `{"ok": true, "accepted": 1}`. A bad batch gets `422` with the validat
 - **session_id**: a new one after 30 minutes without activity.
 - **context.webdriver**: `true` when Selenium, Playwright or Puppeteer drives the browser.
 - **context.languages**: how many languages the browser lists; headless browsers often list none.
+- **context.test_label** / **context.tester** (optional): only on test sessions opened through a tester link,
+  e.g. `?lo_test=genuine&lo_tester=t01`. `test_label` is `genuine`, `junk` or `bot` (anything else is dropped);
+  `tester` is a code, not a name (up to 40 characters). Scoring never reads them; `ml/train.py` uses them to
+  build the real test set. `?lo_test=off` clears them from the browser.
 - The server adds the IP address (first `X-Forwarded-For` entry behind a proxy) and the `User-Agent` header.
 
 ### Event types
@@ -144,7 +148,8 @@ Then, as things happen:
 ```
 
 `VisitorOut` fields: `id`, `site`, `first_seen`, `last_seen`, `session_count`, `page_views`, `event_count`,
-`lead_count`, `chat_count`, `last_path`, `last_ip`, `device`, `automation_hints`, `profile`, `label`.
+`lead_count`, `chat_count`, `last_path`, `last_ip`, `device`, `automation_hints`, `profile`, `label`,
+`test_label` (`genuine` / `junk` / `bot` on test sessions, otherwise `null`).
 `automation_hints` lists raw signals (`webdriver`, `automation_user_agent`, `no_browser_languages`,
 `no_user_agent`); it is not a verdict.
 

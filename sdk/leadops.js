@@ -13,6 +13,10 @@
  *   LeadOps.ids()                                { visitor_id, session_id } for your own API calls
  *   LeadOps.flush()                              send queued events now
  *
+ * Test sessions (for measuring LeadOps on real people and real bots):
+ *   open any page with ?lo_test=genuine (or junk / bot) and optionally &lo_tester=t01. The browser remembers it
+ *   and sends it with every batch until ?lo_test=off. Scoring ignores it; only the training script reads it.
+ *
  * Privacy: never reads what people type or fill in; it only counts actions and measures timings.
  * Event shapes are documented in docs/CONTRACTS.md.
  */
@@ -20,7 +24,7 @@
   "use strict";
   if (window.LeadOps && window.LeadOps.version) return; // already loaded on this page
 
-  var VERSION = "1.0.0";
+  var VERSION = "1.1.0";
   var SESSION_TIMEOUT_MS = 30 * 60 * 1000; // a new visit starts after 30 minutes without activity
   var FLUSH_INTERVAL_MS = 5000;
   var ACTIVITY_INTERVAL_MS = 10000;
@@ -57,6 +61,10 @@
   function save(key, value) {
     memory[key] = value;
     try { window.localStorage.setItem(key, value); } catch (e) { /* storage blocked: memory only */ }
+  }
+  function forget(key) {
+    delete memory[key];
+    try { window.localStorage.removeItem(key); } catch (e) { /* storage blocked */ }
   }
 
   function newId() {
@@ -99,6 +107,24 @@
     } catch (e) { /* very old browser */ }
   })();
 
+  // A tester link (?lo_test=genuine&lo_tester=t01) marks this browser as a test session, so repeat visits count too.
+  var TEST_LABELS = ["genuine", "junk", "bot"];
+  (function captureTestLabel() {
+    try {
+      var params = new URLSearchParams(location.search);
+      var label = (params.get("lo_test") || "").toLowerCase();
+      if (label === "off") {
+        forget("leadops_test");
+        forget("leadops_tester");
+      } else if (TEST_LABELS.indexOf(label) >= 0) {
+        save("leadops_test", label);
+        var tester = (params.get("lo_tester") || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 40);
+        if (tester) save("leadops_tester", tester);
+        else forget("leadops_tester");
+      }
+    } catch (e) { /* very old browser */ }
+  })();
+
   function context() {
     var nav = window.navigator || {};
     var timezone = null;
@@ -115,7 +141,9 @@
       hardware_concurrency: nav.hardwareConcurrency || null,
       webdriver: nav.webdriver === true, // true when Selenium, Playwright or Puppeteer drives the browser
       referrer: document.referrer || null,
-      utm: utm
+      utm: utm,
+      test_label: load("leadops_test") || undefined, // left out of the JSON unless this is a test session
+      tester: load("leadops_tester") || undefined
     };
   }
 

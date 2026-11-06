@@ -68,6 +68,14 @@ export const IconCheck = (props) => (
   </Icon>
 );
 
+// A lab flask: marks test sessions opened through a tester link.
+export const IconTest = (props) => (
+  <Icon {...props}>
+    <path d="M9 3h6M10 3v6L4.5 19a1.5 1.5 0 0 0 1.3 2h12.4a1.5 1.5 0 0 0 1.3-2L14 9V3" />
+    <path d="M7 15h10" />
+  </Icon>
+);
+
 // The brand mark: a plan square with two inner walls.
 export const PlanMark = ({ className = "size-7" }) => (
   <svg viewBox="0 0 32 32" className={className} aria-hidden="true">

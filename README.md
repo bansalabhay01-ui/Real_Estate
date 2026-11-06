@@ -75,6 +75,42 @@ Open http://localhost:5173 for the demo site and http://localhost:5173/dashboard
 for Week 2 training. The same `--seed` gives the same data. `--send URL` also posts the sessions to a running
 backend. `--chat` sends their chat messages too, which calls your LLM if a key is set.
 
+## Collecting real test sessions
+
+To measure LeadOps on real people, classmates browse the demo site through a **tester link**. The link marks
+their browser as a test session. Scoring ignores the mark; `ml/train.py` uses it to build the real test set.
+
+| Link | Use it for |
+|---|---|
+| `/?lo_test=genuine&lo_tester=t01` | browsing as a real buyer |
+| `/?lo_test=junk&lo_tester=t02` | playing a junk lead on purpose: a broker asking for inventory, a fake number |
+| `/?lo_test=bot&lo_tester=bot-naive` | bots (the Playwright bots add this themselves) |
+| `/?lo_test=off` | clearing the mark from a browser |
+
+Give each tester a code (`t01`, `t02`, ...) rather than their name. The browser remembers the mark, so a repeat
+visit from the same device counts too. The dashboard shows a "Test" chip on these visitors.
+
+**What to tell testers**
+
+> Open the link on your phone or laptop and look for a home as if you were really buying: pick a city and a
+> budget, open a few homes, try the EMI calculator or the floor plan if you'd use them, and ask the assistant
+> anything. Take 5 to 10 minutes. If you send an enquiry, use a made-up 10-digit number starting with 6 to 9 (not
+> 9999999999) and a made-up email, never your real ones.
+
+**Running it over the same Wi-Fi**
+
+1. Connect the laptop and the testers' devices to the same Wi-Fi. If the college Wi-Fi stops devices from
+   reaching each other, use a phone hotspot instead.
+2. Find the laptop's address: `ipconfig` on Windows (the IPv4 address, for example `192.168.1.23`),
+   `ipconfig getifaddr en0` on a Mac, `hostname -I` on Linux.
+3. Start the backend so other devices can reach it, from `backend/`:
+   `.venv\Scripts\python -m uvicorn app.main:app --host 0.0.0.0` (Mac/Linux: `.venv/bin/python -m uvicorn ...`).
+4. Start the site the same way, from `frontend/`: `npm run dev -- --host`.
+5. When Windows asks, allow Python and Node on private networks. If devices still can't connect, set the Wi-Fi
+   network to Private (Settings > Network & internet).
+6. Share `http://192.168.1.23:5173/?lo_test=genuine&lo_tester=t01`, with your laptop's address. The site finds the
+   API on the same laptop by itself.
+
 ## Tests
 
 ```bash

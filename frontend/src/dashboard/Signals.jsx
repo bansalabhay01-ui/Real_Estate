@@ -1,10 +1,10 @@
-import { IconAlert, IconChat, IconEnquiry } from "../components/icons";
+import { IconAlert, IconChat, IconEnquiry, IconTest } from "../components/icons";
 import { formatDuration } from "../lib/format";
 import { FAST_FILL_MS, HINT_LABELS } from "./describe";
 
 // Text stays ink; the coloured icon carries the meaning, and every chip has a label (never colour alone).
-const TONES = { alert: "text-alert", amber: "text-amber", blue: "text-blueprint" };
-const ICONS = { alert: IconAlert, amber: IconEnquiry, blue: IconChat };
+const TONES = { alert: "text-alert", amber: "text-amber", blue: "text-blueprint", test: "text-muted" };
+const ICONS = { alert: IconAlert, amber: IconEnquiry, blue: IconChat, test: IconTest };
 
 export function Chip({ tone, children }) {
   const Icon = ICONS[tone];
@@ -29,6 +29,7 @@ export function SignalChips({ visitor }) {
     chips.push({ key: "lead", tone: "amber", text: visitor.lead_count === 1 ? "Enquiry" : `${visitor.lead_count} enquiries` });
   }
   if (visitor.chat_count > 0) chips.push({ key: "chat", tone: "blue", text: "Chatted" });
+  if (visitor.test_label) chips.push({ key: "test", tone: "test", text: `Test: ${visitor.test_label}` });
 
   if (chips.length === 0) return <span className="text-muted">None yet</span>;
   return (

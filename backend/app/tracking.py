@@ -57,6 +57,7 @@ def visitor_out(visitor: Visitor) -> VisitorOut:
         device=device_from_ua(visitor.user_agent),
         automation_hints=automation_hints(visitor.user_agent, visitor.context or {}),
         profile=visitor.profile or {},
+        test_label=(visitor.context or {}).get("test_label"),
     )
 
 
