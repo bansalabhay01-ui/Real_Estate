@@ -71,9 +71,13 @@ Open http://localhost:5173 for the demo site and http://localhost:5173/dashboard
 
 ## Simulator
 
-`python ml/simulator.py` writes 500 labelled sessions (200 bot, 100 junk, 200 genuine) to `ml/data/sessions.jsonl`
-for Week 2 training. The same `--seed` gives the same data. `--send URL` also posts the sessions to a running
-backend. `--chat` sends their chat messages too, which calls your LLM if a key is set.
+`python ml/simulator.py` writes 500 labelled visitors (200 bot, 100 junk, 200 genuine) to `ml/data/sessions.jsonl`
+for training. Each line is a *visitor record*, the same shape live scoring reads from the database
+(`backend/app/scoring/features.py`). Besides plain scrapers and form bots, it makes the hard cases: stealth bots
+that hide `webdriver` and fake mouse moves, slow scrapers, buyers who come back on later days, NRI buyers with
+foreign numbers, browser autofill, privacy browsers and ad blockers. The same `--seed` gives the same data.
+`--send URL` also posts the visitors to a running backend. `--chat` sends their chat messages too, which calls your
+LLM if a key is set.
 
 ## Collecting real test sessions
 

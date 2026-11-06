@@ -5,15 +5,15 @@ A short diary of LeadOps work sessions, newest first. Claude saves each session 
 ## Current status
 _Last updated: 2026-11-06_
 
-- **Phase:** Week 2 (Intelligence, 6–13 Nov) in progress: Part 1 of 6 done. Deadline about 30 Nov 2026.
-- **Done:** the Week 1 foundation (demo property site, tracking SDK, FastAPI backend, a basic property assistant in English, Hinglish and Hindi, the live sales dashboard, the traffic simulator, the shared contracts draft) and the Week 2 build plan ("Week 2 Build Plan" at the end of `LEADOPS_PLAN.md`). Week 2 Part 1: tester links that label real test sessions, and same-Wi-Fi testing. 37 tests pass. Roughly 33% of the whole plan.
-- **Next:** Week 2 Part 2: simulator v2, features and rules. Classmates can start test sessions now (README, "Collecting real test sessions").
+- **Phase:** Week 2 (Intelligence, 6–13 Nov) in progress: Parts 1 and 2 of 6 done. Deadline about 30 Nov 2026.
+- **Done:** the Week 1 foundation (demo property site, tracking SDK, FastAPI backend, a basic property assistant in English, Hinglish and Hindi, the live sales dashboard, the traffic simulator, the shared contracts draft) and the Week 2 build plan ("Week 2 Build Plan" at the end of `LEADOPS_PLAN.md`). Week 2 Part 1: tester links that label real test sessions, and same-Wi-Fi testing. Part 2: simulator v2, the shared visitor features and the bot/junk rules. 77 tests pass. Roughly 38% of the whole plan.
+- **Next:** Week 2 Part 3: the LightGBM model, intent score, labels and reasons. Classmates can start test sessions now (README, "Collecting real test sessions").
 - **Blocked:** nothing. The assistant's LLM replies haven't been tried with a real API key yet (template replies work).
 - **Code:** https://github.com/bansalabhay01-ui/Real_Estate (branch `main`)
 
 ---
 
-## 2026-11-06 · bansalabhay01-ui · Week 2 plan and Part 1 (tester link)
+## 2026-11-06 · bansalabhay01-ui · Week 2 plan, Parts 1-2 (tester link, features and rules)
 
 **Done**
 - Wrote the Week 2 build plan as a new section at the end of `LEADOPS_PLAN.md`. It has six parts: tester link for real sessions, simulator v2 + features + rules, LightGBM model + intent score + labels + reasons, dashboard v1 with scores, Playwright bots, and LLM extraction + visitor type. It also lists the contract additions, new files, new packages, changes from the main plan and the checks.
@@ -23,9 +23,16 @@ _Last updated: 2026-11-06_
 - The site now looks for the API on port 8000 of the machine that serves the page, unless `VITE_API_URL` is set, so classmates' phones on the same Wi-Fi need no settings.
 - Installed the Week 2 packages: `lightgbm` 4.7.0, `numpy` 2.5.4 and `scipy` 1.18.1 in `backend/requirements.txt`; `scikit-learn` 1.9.1 and `playwright` 1.64.1 in the new `ml/requirements.txt`.
 - Checked: 37 tests pass, the frontend builds, and a headless Edge check of the tester link passed 10/10.
+- **Part 2, features and rules:**
+  - `backend/app/scoring/features.py`: 41 numbers per visitor from one *visitor record* shape, which the simulator writes and `scoring/engine.py` (`load_record`) builds from the database, so training and live scoring see the same numbers. Only the 27 "how they browse" features go to the ML model.
+  - `backend/app/scoring/rules.py`: phone, email, name and message checks, plus the certain/strong bot and junk signals. NRI numbers are allowed; browser-autofill speed (1-3 s) isn't a signal.
+  - `backend/data/disposable_domains.txt`: 54 throwaway email domains.
+  - `ml/simulator.py` v2 writes visitor records (several visits per visitor) and adds stealth bots, slow scrapers, repeat visits, NRI buyers, autofill, privacy browsers, ad blockers and shared IPs.
+  - `merge_profile` moved from `ai/assistant.py` to `ai/extract.py`, next to the new `profile_from_messages`.
+  - New `backend/tests/test_scoring.py`: 40 tests, including live-vs-training feature parity and "simulated genuine buyers never trip a certain signal". 77 tests pass.
 
 **Next**
-- Part 2: simulator v2, features and rules.
+- Part 3: the LightGBM model, intent score, labels and reasons.
 
 **Notes**
 - The user said "continue" without answering the plan's two decisions, so the plan's recommendations apply: the contract additions as planned (written into `docs/CONTRACTS.md` as each part lands) and same-Wi-Fi testing.

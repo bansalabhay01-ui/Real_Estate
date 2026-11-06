@@ -101,6 +101,26 @@ def extract_details(message: str) -> dict:
     return details
 
 
+def merge_profile(profile: dict, found: dict) -> dict:
+    """Newest details win. A new budget replaces the old one; a new city drops a locality from another city."""
+    merged = dict(profile)
+    if "budget_min" in found or "budget_max" in found:
+        merged.pop("budget_min", None)
+        merged.pop("budget_max", None)
+    if "city" in found and "locality" not in found and found["city"] != profile.get("city"):
+        merged.pop("locality", None)
+    merged.update(found)
+    return merged
+
+
+def profile_from_messages(messages: list[str]) -> dict:
+    """Buyer details from a whole conversation, oldest message first (as the assistant builds them live)."""
+    profile: dict = {}
+    for message in messages:
+        profile = merge_profile(profile, extract_details(message))
+    return profile
+
+
 def detect_language(message: str) -> str:
     if _DEVANAGARI.search(message):
         return "hi"

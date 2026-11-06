@@ -18,7 +18,7 @@ from ..models import ChatMessage, Visitor
 from ..schemas import ChatIn, ChatMessageOut, ChatOut, Listing, VisitorOut
 from ..tracking import get_or_create_visitor, run_in_session, visitor_out
 from ..utils import utcnow
-from .extract import extract_details
+from .extract import extract_details, merge_profile
 from .llm_client import LLMError, llm
 from .privacy import mask_pii
 from .rag import SearchResult, find_listings
@@ -90,18 +90,6 @@ def chat_history(visitor_id: str, limit: int = 50) -> list[ChatMessageOut]:
             select(ChatMessage).where(ChatMessage.visitor_id == visitor_id).order_by(ChatMessage.id.desc()).limit(limit)
         )
         return [ChatMessageOut.model_validate(row) for row in reversed(list(rows))]
-
-
-def merge_profile(profile: dict, found: dict) -> dict:
-    """Newest details win. A new budget replaces the old one; a new city drops a locality from another city."""
-    merged = dict(profile)
-    if "budget_min" in found or "budget_max" in found:
-        merged.pop("budget_min", None)
-        merged.pop("budget_max", None)
-    if "city" in found and "locality" not in found and found["city"] != profile.get("city"):
-        merged.pop("locality", None)
-    merged.update(found)
-    return merged
 
 
 def missing_details(profile: dict) -> list[str]:
