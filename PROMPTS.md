@@ -67,3 +67,16 @@ Every prompt typed to Claude Code in this project is added below automatically, 
 
 > you only by yourself have to make the session according to you and before creating new session just save the context of the previous session and commit it to the github 
 > the link of the github repo is:https://github.com/bansalabhay01-ui/Real_Estate.git
+
+### 2026-11-06 20:02 · bansalabhay01-ui
+
+> resume
+
+### 2026-11-06 20:04 · bansalabhay01-ui
+
+> (Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned) ; (& c:\Users\91700\OneDrive\Desktop\real_estate\backend\.venv\Scripts\Activate.ps1)
+> claude doctor
+
+### 2026-11-06 20:06 · bansalabhay01-ui
+
+> ok continue with the work you left over
