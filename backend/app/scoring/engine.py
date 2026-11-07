@@ -1,21 +1,103 @@
 """Scoring a visitor live: load what we know from the database, score it, save it and tell the dashboard.
 
+Every event batch, enquiry and chat message rescores its visitor (rules and the model take milliseconds).
 load_record() builds the same *visitor record* the simulator writes (see features.py), so live scoring and
-training compute features from the same shape.
+training compute features from the same shape. Scoring never breaks ingestion: any error is logged and skipped.
 """
 
+import logging
 from collections import defaultdict
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..models import ChatMessage, Event, Lead, Visitor, VisitSession
+from ..db import SessionLocal
+from ..models import ChatMessage, Event, Lead, Score, Visitor, VisitSession
+from ..realtime import hub
+from ..schemas import VisitorOut
+from ..tracking import visitor_out
+from ..utils import utcnow
+from .combine import score_record
 from .features import NAN
+from .model import reload_model
 from .rules import phone_digits
+
+log = logging.getLogger("leadops.scoring")
 
 MAX_EVENTS = 3000  # the newest events of one visitor that scoring reads (scrapers can send thousands)
 IP_WINDOW = timedelta(hours=24)
+HISTORY_INTENT_STEP = 10  # a new row in the scores table when the label changes or intent moves this much
+
+
+@dataclass
+class ScoreUpdate:
+    visitor: VisitorOut
+    previous_label: str | None
+
+    @property
+    def label_changed(self) -> bool:
+        return self.visitor.label != self.previous_label
+
+
+def score_visitor(visitor_id: str) -> ScoreUpdate | None:
+    """Score one visitor, save the result on it and, when it changed enough, in the scores table."""
+    with SessionLocal() as db:
+        record = load_record(db, visitor_id)
+        if record is None:
+            return None
+        visitor = db.get(Visitor, visitor_id)
+        result = score_record(record, visitor_type=visitor.visitor_type)
+        previous_label, previous_intent = visitor.label, visitor.intent_score
+        now = utcnow()
+        saved = result.as_json()
+        saved["scored_at"] = now.isoformat(timespec="seconds") + "Z"
+        visitor.label, visitor.intent_score = result.label, result.intent_score
+        visitor.human_prob, visitor.score, visitor.scored_at = round(result.human.human_prob, 4), saved, now
+        if previous_label != result.label or abs((previous_intent or 0) - result.intent_score) >= HISTORY_INTENT_STEP:
+            latest_lead = db.scalar(select(Lead.id).where(Lead.visitor_id == visitor_id).order_by(Lead.id.desc()).limit(1))
+            db.add(Score(visitor_id=visitor_id, lead_id=latest_lead, label=result.label, human_prob=visitor.human_prob,
+                         intent_score=result.intent_score, reasons=result.reasons, model_version=result.human.version,
+                         created_at=now))
+        db.commit()
+        return ScoreUpdate(visitor_out(visitor), previous_label)
+
+
+def score_safely(visitor_id: str | None) -> ScoreUpdate | None:
+    """score_visitor() that never raises: a scoring bug must not lose an event batch or an enquiry."""
+    if not visitor_id:
+        return None
+    try:
+        return score_visitor(visitor_id)
+    except Exception:
+        log.exception("Scoring failed for visitor %s", visitor_id)
+        return None
+
+
+async def publish(visitor: VisitorOut | None, update: ScoreUpdate | None) -> None:
+    """Tell the dashboards: the visitor as it is now, and a score_update when its label changed."""
+    current = update.visitor if update else visitor
+    if current is None:
+        return
+    await hub.broadcast({"type": "visitor_update", "visitor": current.model_dump(mode="json")})
+    if update and update.label_changed and current.score:
+        await hub.broadcast({
+            "type": "score_update", "visitor_id": current.id, "label": current.label,
+            "previous_label": update.previous_label, "intent_score": current.score.intent_score,
+            "human_prob": current.score.human_prob, "visitor_type": current.score.visitor_type,
+            "reasons": current.score.reasons,
+        })  # fmt: skip
+
+
+def rescore_all() -> int:
+    """Reload the model from disk (after ml/train.py) and rescore every visitor, most recent first."""
+    reload_model()
+    with SessionLocal() as db:
+        visitor_ids = list(db.scalars(select(Visitor.id).order_by(Visitor.last_seen.desc())))
+    for visitor_id in visitor_ids:
+        score_safely(visitor_id)
+    return len(visitor_ids)
 
 
 def _ms(value: datetime | None) -> int | None:

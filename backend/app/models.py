@@ -1,8 +1,9 @@
 """Database tables.
 
 Visitor -> VisitSession -> Event hold what the tracking SDK sends, Lead holds enquiry-form submissions and
-ChatMessage holds assistant conversations. Score (Week 2 scoring engine) and Feedback (Week 3 sales feedback
-loop) exist now so the schema doesn't change under the team later.
+ChatMessage holds assistant conversations. A visitor's latest score lives on the Visitor row; Score keeps every
+label change (scoring engine) and Feedback holds sales verdicts (Week 3 feedback loop).
+New columns on existing tables are added at startup by db.init_db(), so existing databases keep working.
 """
 
 from datetime import datetime
@@ -35,6 +36,14 @@ class Visitor(Base):
     event_count: Mapped[int] = mapped_column(Integer, default=0)
     lead_count: Mapped[int] = mapped_column(Integer, default=0)
     chat_count: Mapped[int] = mapped_column(Integer, default=0)  # messages the visitor sent to the assistant
+    # The latest score (scoring/engine.py). Every label change is also kept in the scores table.
+    label: Mapped[str | None] = mapped_column(String(10), index=True)  # Bot / Junk / Review / Cold / Warm / Hot
+    intent_score: Mapped[int | None] = mapped_column(Integer)  # 0-100
+    human_prob: Mapped[float | None] = mapped_column(Float)  # 0-1, from the ML human check
+    score: Mapped[dict | None] = mapped_column(JSON)  # reasons, visitor type, model version and the full breakdown
+    scored_at: Mapped[datetime | None] = mapped_column(DateTime)
+    # end_buyer / investor / tenant / broker / spam from the visitor's messages: {type, confidence, reason, source}
+    visitor_type: Mapped[dict | None] = mapped_column(JSON)
 
     sessions: Mapped[list["VisitSession"]] = relationship(back_populates="visitor")
 

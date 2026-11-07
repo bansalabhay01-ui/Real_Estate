@@ -4,8 +4,8 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from pydantic import ValidationError
 
-from ..realtime import hub
 from ..schemas import EventBatchIn, EventsAccepted
+from ..scoring.engine import publish, score_safely
 from ..tracking import store_event_batch
 from ..utils import client_ip
 
@@ -33,5 +33,6 @@ async def ingest_events(request: Request) -> EventsAccepted:
         raise HTTPException(status_code=422, detail=detail) from None
 
     visitor = await run_in_threadpool(store_event_batch, batch, client_ip(request), request.headers.get("user-agent"))
-    await hub.broadcast({"type": "visitor_update", "visitor": visitor.model_dump(mode="json")})
+    update = await run_in_threadpool(score_safely, batch.visitor_id)  # rules + model: a few milliseconds
+    await publish(visitor, update)
     return EventsAccepted(accepted=len(batch.events))

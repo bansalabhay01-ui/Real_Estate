@@ -2,7 +2,9 @@
 
 from collections.abc import Iterator
 
-from sqlalchemy import create_engine, event
+import logging
+
+from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from .config import settings
@@ -35,10 +37,33 @@ class Base(DeclarativeBase):
 
 
 def init_db() -> None:
-    """Create any missing tables. (Add Alembic migrations once the schema settles.)"""
+    """Create any missing tables, and add columns that were added to the models after a table was created."""
     from . import models  # noqa: F401  (importing registers the tables)
 
     Base.metadata.create_all(engine)
+    _add_missing_columns()
+
+
+def _add_missing_columns() -> None:
+    """A tiny migration step: ALTER TABLE ... ADD COLUMN for new nullable columns, plus their indexes.
+
+    Enough while the team only ever adds columns. Switch to Alembic if a column is ever renamed or changed.
+    """
+    inspector = inspect(engine)
+    with engine.begin() as connection:
+        for table in Base.metadata.sorted_tables:
+            if not inspector.has_table(table.name):
+                continue
+            existing = {column["name"] for column in inspector.get_columns(table.name)}
+            added = [column for column in table.columns if column.name not in existing]
+            for column in added:
+                column_type = column.type.compile(dialect=engine.dialect)
+                connection.execute(text(f'ALTER TABLE "{table.name}" ADD COLUMN "{column.name}" {column_type}'))
+                logging.getLogger("leadops.db").info("Added column %s.%s", table.name, column.name)
+            names = {column.name for column in added}
+            for index in table.indexes:
+                if names & {column.name for column in index.columns}:
+                    index.create(connection, checkfirst=True)
 
 
 def get_db() -> Iterator[Session]:

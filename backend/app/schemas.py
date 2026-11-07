@@ -117,6 +117,19 @@ class EventsAccepted(BaseModel):
 # ---------------------------------------------------------------- visitors (dashboard)
 
 
+class ScoreOut(BaseModel):
+    """A visitor's latest score from the scoring engine (docs/CONTRACTS.md, section 6)."""
+
+    label: str  # Bot / Junk / Review / Cold / Warm / Hot
+    intent_score: int  # 0-100
+    human_prob: float  # 0-1, from the ML human check
+    visitor_type: str | None = None  # end_buyer / investor / tenant / broker / spam, once known
+    reasons: list[str]  # plain-language reasons, most important first
+    summary: str  # one line: "Hot: 3 visits over 2 days; ..."
+    model_version: str
+    scored_at: str  # ISO 8601 UTC
+
+
 class VisitorOut(BaseModel):
     id: str
     site: str | None
@@ -132,8 +145,9 @@ class VisitorOut(BaseModel):
     device: str  # desktop / mobile / tablet / unknown
     automation_hints: list[str]  # raw bot signals, e.g. "webdriver"
     profile: dict[str, Any]  # buyer details from chat
-    label: str | None = None  # Bot / Junk / Cold / Warm / Hot / Review, set by the scoring engine (Week 2)
+    label: str | None = None  # Bot / Junk / Review / Cold / Warm / Hot, set by the scoring engine
     test_label: str | None = None  # genuine / junk / bot on test sessions from a tester link
+    score: ScoreOut | None = None  # None until the visitor has been scored
 
 
 class StatsOut(BaseModel):
@@ -143,6 +157,12 @@ class StatsOut(BaseModel):
     active_now: int  # seen in the last 2 minutes
     leads: int
     chatting_visitors: int  # visitors who talked to the assistant
+    labels: dict[str, int] = {}  # visitors per label, e.g. {"Hot": 4, "Bot": 120}
+
+
+class RescoreOut(BaseModel):
+    ok: bool = True
+    visitors: int  # how many visitors are being rescored
 
 
 class SessionOut(BaseModel):
@@ -197,6 +217,14 @@ class LeadAccepted(BaseModel):
     lead_id: int
 
 
+class LeadCheckOut(BaseModel):
+    """One check on an enquiry's details, shown next to it on the dashboard."""
+
+    check: str  # phone / email / name / message / honeypot / fill_time
+    ok: bool
+    text: str
+
+
 class LeadOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -215,6 +243,8 @@ class LeadOut(BaseModel):
     ip: str | None
     status: str
     created_at: UTCDateTime
+    label: str | None = None  # the visitor's current label
+    checks: list[LeadCheckOut] = []
 
 
 # ---------------------------------------------------------------- property assistant -> POST /chat
@@ -255,6 +285,7 @@ class VisitorDetailOut(BaseModel):
     events: list[EventOut]  # newest first, up to 200
     leads: list[LeadOut]  # newest first
     chat: list[ChatMessageOut]  # oldest first
+    score_detail: dict[str, Any] | None = None  # rules that fired, SHAP factors, intent points (docs/CONTRACTS.md)
 
 
 # ---------------------------------------------------------------- sales feedback -> POST /feedback

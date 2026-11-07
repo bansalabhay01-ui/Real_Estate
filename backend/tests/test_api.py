@@ -23,7 +23,8 @@ def send_events(client, visitor_id, session_id, events, *, context=None):
 
 def test_health(client):
     data = client.get("/health").json()
-    assert data == {"status": "ok", "llm": "template", "listings": 18}
+    assert {key: data[key] for key in ("status", "llm", "listings")} == {"status": "ok", "llm": "template", "listings": 18}
+    assert data["model"].startswith("lgbm-")  # the trained model in backend/data/model is loaded
 
 
 def test_listings_and_filters(client):

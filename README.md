@@ -1,11 +1,11 @@
 # LeadOps
 
 LeadOps finds the genuine buyers among a real estate website's visitors. One script tag tracks every visitor,
-bots and junk enquiries get filtered out (scoring arrives in Week 2), and the sales team watches visitors arrive
-live, with the buyer details the assistant picked up.
+every visitor is scored live (Bot, Junk, Review, Cold, Warm or Hot, with the reasons), and the sales team watches
+them arrive on a live dashboard, with the buyer details the assistant picked up.
 
-This is the Week 1 foundation from [LEADOPS_PLAN.md](LEADOPS_PLAN.md): a demo property site, the tracking SDK,
-the event API, a basic property assistant, a live sales dashboard and a traffic simulator.
+Built so far, from [LEADOPS_PLAN.md](LEADOPS_PLAN.md): a demo property site, the tracking SDK, the event API, a
+basic property assistant, a live sales dashboard, a traffic simulator (Week 1) and the scoring engine (Week 2).
 
 ## What's where
 
@@ -15,9 +15,9 @@ the event API, a basic property assistant, a live sales dashboard and a traffic 
 | `sdk/` | `leadops.js`, the tracking script, and `demo.html`, a plain page that uses it | A |
 | `backend/app/` | FastAPI: events, listings, enquiries, chat, feedback, dashboard WebSocket | B |
 | `backend/app/ai/` | LLM wrapper, buyer-detail extraction, listing search, the assistant | C |
-| `backend/app/scoring/` | the scoring engine (Week 2) | B |
-| `backend/data/` | `listings.json`: 18 fictional homes in 5 cities | everyone |
-| `ml/` | `simulator.py`: labelled bot / junk / genuine traffic | B |
+| `backend/app/scoring/` | the scoring engine: features, rules, the LightGBM model, labels and reasons | B |
+| `backend/data/` | `listings.json` (18 fictional homes in 5 cities), throwaway email domains, the trained model | everyone |
+| `ml/` | `simulator.py` (labelled bot / junk / genuine traffic) and `train.py` (trains the model) | B |
 | `docs/CONTRACTS.md` | the shared JSON contracts; read it before changing an API | everyone |
 
 ## Run it
@@ -78,6 +78,39 @@ that hide `webdriver` and fake mouse moves, slow scrapers, buyers who come back 
 foreign numbers, browser autofill, privacy browsers and ad blockers. The same `--seed` gives the same data.
 `--send URL` also posts the visitors to a running backend. `--chat` sends their chat messages too, which calls your
 LLM if a key is set.
+
+## Scoring
+
+Every event batch, enquiry and chat message rescores its visitor, in a few milliseconds:
+
+- **Rules** (`backend/app/scoring/rules.py`) check the details: the hidden honeypot, `navigator.webdriver`, the
+  phone number (Indian mobiles; NRI numbers are fine), placeholder names and emails, spam and broker messages.
+  *Certain* signals decide on their own; *strong* ones have innocent explanations (browser autofill, an ad
+  blocker), so one alone only sends a visitor to Review.
+- **The ML human check** (`model.py`): a LightGBM model that looks only at *how* someone browses (timing, mouse
+  and touch activity, the browser) and gives the chance that it's a real person. SHAP values say why.
+- **Intent points** (`combine.py`), out of 100: time on property pages, repeat visits, details shared with the
+  assistant, EMI calculator, floor plan, a valid enquiry, a focused search and the filters. Cold < 40, Warm 40-70,
+  Hot > 70.
+
+`GET /visitors/{id}` returns the whole breakdown as `score_detail` (docs/CONTRACTS.md, section 6).
+
+**Training the model.** The trained model is committed (`backend/data/model/`), so you only retrain after
+changing the features or the simulator. Install the training packages once, then train and relabel everyone:
+
+```bash
+backend\.venv\Scripts\python -m pip install -r ml/requirements.txt      # Mac/Linux: backend/.venv/bin/python
+python ml/simulator.py --bots 800 --junk 400 --genuine 800
+backend\.venv\Scripts\python ml/train.py
+```
+
+Then restart the backend, or relabel everyone without a restart: `POST /scoring/rescore` (open
+http://localhost:8000/docs, find it and press "Try it out").
+
+`ml/train.py` prints how the model and the whole engine do on simulated visitors it never saw, and on the real
+test set (tester-link visitors in your database). Simulated numbers run high; the real test set is what counts.
+`python ml/simulator.py --send http://localhost:8000 --report` sends fresh traffic to a running backend and prints
+how each kind of visitor was labelled.
 
 ## Collecting real test sessions
 

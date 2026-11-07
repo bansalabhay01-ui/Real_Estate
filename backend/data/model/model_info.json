@@ -1,0 +1,110 @@
+{
+  "version": "lgbm-20261106-a53bb8",
+  "thresholds": {
+    "bot": 0.2,
+    "review": 0.5
+  },
+  "features": [
+    "webdriver",
+    "automation_ua",
+    "no_user_agent",
+    "browser_languages",
+    "timezone_utc",
+    "viewport_matches_screen",
+    "hardware_concurrency",
+    "touch_mismatch",
+    "page_views",
+    "duration_s",
+    "pages_per_minute",
+    "median_dwell_s",
+    "fast_pages",
+    "scrolls_per_page",
+    "activity_coverage",
+    "mouse_moves_per_min",
+    "mouse_px_per_move",
+    "touches_per_min",
+    "keys",
+    "trusted_clicks",
+    "untrusted_clicks",
+    "event_gap_cv",
+    "honeypot",
+    "min_fill_s",
+    "lead_without_pageviews",
+    "seconds_to_first_lead",
+    "ip_visitors"
+  ],
+  "trained_at": "2026-11-06T15:31:20Z",
+  "lightgbm": "4.7.0",
+  "trees": 265,
+  "params": {
+    "objective": "binary",
+    "learning_rate": 0.05,
+    "num_leaves": 15,
+    "min_data_in_leaf": 10,
+    "feature_fraction": 0.8,
+    "bagging_fraction": 0.8,
+    "bagging_freq": 1,
+    "lambda_l2": 1.0,
+    "seed": 7,
+    "deterministic": true,
+    "force_row_wise": true,
+    "num_threads": 1,
+    "verbosity": -1
+  },
+  "data": {
+    "file": "sessions.jsonl",
+    "visitors": 2000,
+    "by_label": {
+      "bot": 800,
+      "genuine": 800,
+      "junk": 400
+    },
+    "train_rows": 5547,
+    "test_rows": 1862
+  },
+  "metrics": {
+    "model_on_unseen_simulated": {
+      "auc": 1.0,
+      "bot_precision": 0.9926,
+      "bot_recall": 0.997
+    },
+    "engine_on_unseen_simulated": {
+      "bots_caught": 1.0,
+      "bots_filtered": 1.0,
+      "junk_filtered": 1.0,
+      "genuine_kept": 1.0,
+      "genuine_in_review": 0.015
+    },
+    "engine_on_real_test_set": null,
+    "real_test_set_size": 0
+  },
+  "importance": {
+    "viewport_matches_screen": 2.3649,
+    "mouse_px_per_move": 1.1063,
+    "pages_per_minute": 1.07,
+    "browser_languages": 0.8813,
+    "median_dwell_s": 0.783,
+    "hardware_concurrency": 0.6129,
+    "event_gap_cv": 0.5523,
+    "touches_per_min": 0.4108,
+    "scrolls_per_page": 0.3816,
+    "automation_ua": 0.2519,
+    "ip_visitors": 0.2372,
+    "activity_coverage": 0.1968,
+    "duration_s": 0.1889,
+    "webdriver": 0.1768,
+    "mouse_moves_per_min": 0.13,
+    "timezone_utc": 0.0823,
+    "min_fill_s": 0.0757,
+    "page_views": 0.0297,
+    "fast_pages": 0.0146,
+    "seconds_to_first_lead": 0.0055,
+    "untrusted_clicks": 0.0045,
+    "honeypot": 0.0004,
+    "keys": 0.0003,
+    "no_user_agent": 0.0,
+    "touch_mismatch": 0.0,
+    "trusted_clicks": 0.0,
+    "lead_without_pageviews": 0.0
+  }
+}

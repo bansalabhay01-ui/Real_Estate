@@ -11,7 +11,9 @@ import pytest
 from app.ai.extract import profile_from_messages
 from app.config import REPO_DIR
 from app.db import SessionLocal
+from app.scoring.combine import score_record
 from app.scoring.engine import load_record
+from app.scoring.model import MODEL_DIR, HumanModel, load_model
 from app.scoring.features import MODEL_FEATURES, add_network_counts, cut_record, model_vector, pages, visitor_features
 from app.scoring.rules import BOT, CERTAIN, JUNK, STRONG, check_email, check_message, check_phone, evaluate, is_junk_text
 
@@ -249,3 +251,128 @@ def test_simulated_genuine_buyers_never_trip_a_certain_signal():
     for record in records:
         record["profile"] = profile_from_messages([message["text"] for message in record["chat"]])
         assert not codes(signals_for(record), strength=CERTAIN), record["kind"]
+
+
+# ---------------------------------------------------------------- labels, intent and reasons
+
+
+def serious_buyer():
+    first = browsing(start=1_000_000, pages_open=3, dwell_ms=90_000) + [
+        {"type": "filter_used", "ts": 1_010_000, "path": "/", "props": {"city": "Pune"}},
+        {"type": "emi_used", "ts": 1_100_000, "path": "/property/PUN-002", "props": {"listing_id": "PUN-002", "price_inr": 8_500_000}},
+        {"type": "floorplan_download", "ts": 1_150_000, "path": "/property/PUN-002", "props": {"listing_id": "PUN-002", "bhk": 3}},
+    ]
+    record = visitor(events=first, leads=[lead(client_ts=1_400_000)],
+                     chat=[{"text": "3BHK under 90L in Pune, moving in 3 months", "ts": 1_200_000}])
+    two_days_later = browsing(start=1_000_000 + 2 * 86_400_000, pages_open=2, dwell_ms=60_000)
+    record["sessions"].append({"session_id": "s2", "ip": "198.18.0.1", "events": two_days_later})
+    record["profile"] = profile_from_messages([message["text"] for message in record["chat"]])
+    return record
+
+
+def test_a_serious_buyer_is_hot_and_says_why():
+    result = score_record(serious_buyer())
+    assert result.label == "Hot" and result.intent_score > 70
+    assert "Checked the EMI on a ₹85 L home" in result.reasons
+    assert "2 visits over 2 days" in " ".join(result.reasons + [p.detail for p in result.points])
+    assert result.summary.startswith("Hot: ")
+
+
+def test_a_short_look_is_cold():
+    result = score_record(visitor(events=browsing(pages_open=1, dwell_ms=20_000)))
+    assert result.label == "Cold" and result.reasons
+
+
+def test_bots_and_junk_get_labelled_with_reasons():
+    bot = score_record(visitor(leads=[lead(honeypot="http://promo.example")]))
+    assert bot.label == "Bot" and bot.reasons[0].startswith("Filled in the hidden form field")
+    junk = score_record(visitor(leads=[lead(name="asdf", phone="9999999999")]))
+    assert junk.label == "Junk" and any("phone number can't be real" in reason for reason in junk.reasons)
+
+
+def test_real_buyers_are_never_silently_thrown_away():
+    strong_buyer = serious_buyer()
+    strong_buyer["leads"][0]["phone"] = "9999999999"  # a fake number, but every buying signal
+    assert score_record(strong_buyer).label == "Review"
+    adblocked = visitor(events=[], leads=[lead()])
+    assert score_record(adblocked).label == "Review"  # one strong signal: Review, never Bot
+    just_landed = visitor(events=[{"type": "page_view", "ts": 1_000_000, "path": "/", "props": {}}])
+    assert score_record(just_landed).label == "Cold"
+
+
+def test_the_fallback_formula_still_scores():
+    result = score_record(serious_buyer(), model=HumanModel())
+    assert result.human.source == "fallback" and result.label in ("Warm", "Hot")
+    scraper = visitor(events=browsing(pages_open=12, dwell_ms=500, human=False))
+    assert score_record(scraper, model=HumanModel()).label == "Bot"
+
+
+def test_the_model_loads_even_with_windows_line_endings(tmp_path):
+    for name in ("bot_model.txt", "model_info.json"):
+        text = (MODEL_DIR / name).read_bytes().decode("utf-8").replace("\r\n", "\n").replace("\n", "\r\n")
+        (tmp_path / name).write_bytes(text.encode("utf-8"))
+    model = load_model(tmp_path)
+    assert model.booster is not None and model.predict(visitor_features(serious_buyer())).source == "model"
+
+
+# ---------------------------------------------------------------- scoring through the API
+
+
+def post_batch(client, visitor_id, session_id, events, context):
+    batch = {"visitor_id": visitor_id, "session_id": session_id, "context": context, "events": events}
+    return client.post("/events", content=json.dumps(batch), headers={"Content-Type": "text/plain"})
+
+
+def test_event_batches_are_scored_live(client):
+    visitor_id, session_id = str(uuid.uuid4()), str(uuid.uuid4())
+    with client.websocket_connect("/ws/dashboard") as ws:
+        assert ws.receive_json()["type"] == "snapshot"
+        post_batch(client, visitor_id, session_id, browsing(pages_open=3, dwell_ms=500, human=False), {"webdriver": True})
+        update = ws.receive_json()
+        assert update["type"] == "visitor_update" and update["visitor"]["label"] == "Bot"
+        assert update["visitor"]["score"]["reasons"][0].startswith("The browser is driven by automation software")
+        change = ws.receive_json()
+        assert change["type"] == "score_update" and change["label"] == "Bot" and change["previous_label"] is None
+
+    detail = client.get(f"/visitors/{visitor_id}").json()
+    assert "webdriver" in {signal["code"] for signal in detail["score_detail"]["signals"]}
+    assert detail["score_detail"]["human"]["source"] == "model"
+    assert visitor_id in {v["id"] for v in client.get("/visitors", params={"label": "Bot", "limit": 500}).json()}
+    assert client.get("/stats").json()["labels"]["Bot"] >= 1
+    assert client.get("/visitors", params={"label": "Nope"}).status_code == 422
+
+
+def test_enquiries_carry_their_label_and_checks(client):
+    visitor_id, session_id = str(uuid.uuid4()), str(uuid.uuid4())
+    post_batch(client, visitor_id, session_id, browsing(pages_open=2), {"webdriver": False, "languages": 2})
+    with client.websocket_connect("/ws/dashboard") as ws:
+        assert ws.receive_json()["type"] == "snapshot"
+        body = {"visitor_id": visitor_id, "session_id": session_id, "name": "test", "phone": "9999999999",
+                "email": "test@test.com", "form_fill_ms": 9000}
+        assert client.post("/leads", json=body).status_code == 201
+        created = ws.receive_json()
+        assert created["type"] == "lead_created" and created["lead"]["label"] == "Junk"
+        failed = {check["check"] for check in created["lead"]["checks"] if not check["ok"]}
+        assert {"phone", "email", "name"} <= failed and "honeypot" not in failed
+
+
+def test_rescore_relabels_everyone(client):
+    response = client.post("/scoring/rescore")
+    assert response.status_code == 200 and response.json()["visitors"] >= 1
+
+
+def test_new_columns_are_added_to_an_old_database(tmp_path, monkeypatch):
+    from sqlalchemy import create_engine, inspect, text
+
+    import app.db
+
+    old = create_engine(f"sqlite:///{(tmp_path / 'old.db').as_posix()}")
+    with old.begin() as connection:  # the visitors table as Week 1 created it (trimmed)
+        connection.execute(text("CREATE TABLE visitors (id VARCHAR(64) PRIMARY KEY, site VARCHAR(100))"))
+        connection.execute(text("INSERT INTO visitors (id, site) VALUES ('old-visitor-1', 'demo')"))
+    monkeypatch.setattr(app.db, "engine", old)
+    app.db.init_db()
+    columns = {column["name"] for column in inspect(old).get_columns("visitors")}
+    assert {"label", "intent_score", "human_prob", "score", "scored_at", "visitor_type"} <= columns
+    with old.connect() as connection:
+        assert connection.execute(text("SELECT site FROM visitors")).scalar() == "demo"  # nothing lost

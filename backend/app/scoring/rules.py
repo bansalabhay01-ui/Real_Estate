@@ -173,6 +173,30 @@ def check_message(text: str | None) -> list[Signal]:
     return signals
 
 
+def lead_checks(lead: dict) -> list[dict]:
+    """The checks on one enquiry, for the dashboard: {"check", "ok", "text"} each."""
+    checks = []
+    phone = check_phone(lead.get("phone"))
+    phone_text = {"mobile": "Valid mobile number", "international": "International number"}
+    checks.append({"check": "phone", "ok": phone.kind in phone_text, "text": phone_text.get(phone.kind, f"Phone: {phone.reason}")})
+    email = check_email(lead.get("email"))
+    if email.kind != "none":
+        checks.append({"check": "email", "ok": email.kind == "ok", "text": "Real-looking email" if email.kind == "ok" else f"Email: {email.reason}"})
+    name_ok = not is_junk_text(lead.get("name"))
+    checks.append({"check": "name", "ok": name_ok, "text": "Real-looking name" if name_ok else "Placeholder name"})
+    if (lead.get("message") or "").strip():
+        found = check_message(lead.get("message"))
+        checks.append({"check": "message", "ok": not found, "text": found[0].reason if found else "Message looks genuine"})
+    honeypot = bool(str(lead.get("honeypot") or "").strip())
+    checks.append({"check": "honeypot", "ok": not honeypot, "text": "Hidden field filled in" if honeypot else "Hidden field left empty"})
+    fill = lead.get("form_fill_ms")
+    if fill is not None:
+        fast = fill < FAST_FORM_MS
+        text = "Sent without typing" if fill == 0 else f"Filled in {_seconds(fill)}"
+        checks.append({"check": "fill_time", "ok": not fast, "text": text})
+    return checks
+
+
 # ---------------------------------------------------------------- the rules
 
 

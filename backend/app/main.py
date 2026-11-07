@@ -15,12 +15,14 @@ from .api import api_router
 from .config import REPO_DIR, settings
 from .db import init_db
 from .listings import all_listings
+from .scoring.model import current_model
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     init_db()
     all_listings()  # fail at startup, not on the first request, if listings.json is broken
+    current_model()  # load the scoring model now, not on the first event (falls back to a formula if missing)
     yield
 
 
@@ -42,5 +44,5 @@ if _SDK_DIR.is_dir():
 
 @app.get("/health", tags=["meta"])
 def health() -> dict:
-    """Quick check that the API is up, and which LLM (or template mode) the assistant uses."""
-    return {"status": "ok", "llm": llm.describe(), "listings": len(all_listings())}
+    """Quick check that the API is up, which LLM (or template mode) the assistant uses and which scoring model."""
+    return {"status": "ok", "llm": llm.describe(), "listings": len(all_listings()), "model": current_model().version}

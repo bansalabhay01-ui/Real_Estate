@@ -5,6 +5,7 @@ from fastapi.concurrency import run_in_threadpool
 
 from ..realtime import hub
 from ..schemas import LeadAccepted, LeadIn, LeadOut
+from ..scoring.engine import publish, score_safely
 from ..tracking import get_lead, list_leads, store_lead
 from ..utils import client_ip
 
@@ -16,8 +17,11 @@ async def create_lead(payload: LeadIn, request: Request) -> LeadAccepted:
     """Save an enquiry. Bot-looking ones are saved too and get the same answer, so scoring can label them
     and bots get no hint that they were spotted."""
     lead, visitor = await run_in_threadpool(store_lead, payload, client_ip(request), request.headers.get("user-agent"))
+    update = await run_in_threadpool(score_safely, lead.visitor_id)
+    if update:  # the enquiry reaches the dashboard with its visitor's new label
+        lead = lead.model_copy(update={"label": update.visitor.label})
     await hub.broadcast({"type": "lead_created", "lead": lead.model_dump(mode="json")})
-    await hub.broadcast({"type": "visitor_update", "visitor": visitor.model_dump(mode="json")})
+    await publish(visitor, update)
     return LeadAccepted(lead_id=lead.id)
 
 

@@ -94,6 +94,9 @@ Response `201`: `{"ok": true, "lead_id": 12}`.
 - **form_fill_ms**: from the first touch of the form to submit. `0` means the form was sent without typing.
 - **Never reject bot-looking enquiries.** Save them and answer as usual, so scoring can label them and bots
   get no hint. An enquiry without a `visitor_id` (an API call with no browsing) gets a `nosdk-...` visitor.
+- `LeadOut` (in `GET /leads` and the WebSocket) adds `label` (the visitor's current label, or `null`) and
+  `checks`: `[{"check": "phone", "ok": false, "text": "Phone: the same digit over and over"}, ...]` for `phone`,
+  `email`, `name`, `message`, `honeypot` and `fill_time` (only the ones that apply).
 
 ## 3. Assistant: frontend -> `POST /chat`
 
@@ -120,9 +123,10 @@ Request: `{"visitor_id": "...", "session_id": "...", "message": "3BHK under 90L 
 | Method and path | Purpose | Owner |
 |---|---|---|
 | `POST /events` | SDK event batches | B |
-| `GET /visitors?limit=&offset=` | visitors, most recent activity first | B |
-| `GET /visitors/{id}` | one visitor: sessions, events (newest first, up to 200), enquiries, chat | B |
-| `GET /stats` | `{visitors, active_now, leads, chatting_visitors}` for the dashboard | B |
+| `GET /visitors?limit=&offset=&label=&sort=` | visitors, most recent activity first; `label=Hot` filters, `sort=intent` puts the highest intent first | B |
+| `GET /visitors/{id}` | one visitor: sessions, events (newest first, up to 200), enquiries, chat, `score_detail` | B |
+| `GET /stats` | `{visitors, active_now, leads, chatting_visitors, labels}` for the dashboard; `labels` counts visitors per label, e.g. `{"Hot": 4, "Bot": 120}` | B |
+| `POST /scoring/rescore` | reload the model (after `ml/train.py`) and relabel every visitor in the background: `{"ok": true, "visitors": 512}` | B |
 | `GET /listings?city=&bhk=&min_price=&max_price=&q=` | listings | B |
 | `GET /listings/{id}` | one listing | B |
 | `POST /leads`, `GET /leads`, `GET /leads/{id}` | enquiries | B |
@@ -130,7 +134,7 @@ Request: `{"visitor_id": "...", "session_id": "...", "message": "3BHK under 90L 
 | `POST /feedback`, `GET /feedback` | sales verdicts: `genuine` / `fake` / `converted` | B |
 | `WS /ws/dashboard` | live dashboard feed | B |
 | `GET /sdk/leadops.js` | the tracking script | A |
-| `GET /health` | `{status, llm, listings}` | B |
+| `GET /health` | `{status, llm, listings, model}`; `model` is the scoring model's version, or `fallback` | B |
 
 ## 5. Dashboard WebSocket: `WS /ws/dashboard`
 
@@ -145,17 +149,54 @@ Then, as things happen:
 ```json
 {"type": "visitor_update", "visitor": VisitorOut}
 {"type": "lead_created", "lead": LeadOut}
+{"type": "score_update", "visitor_id": "...", "label": "Hot", "previous_label": "Warm", "intent_score": 82,
+ "human_prob": 0.99, "visitor_type": null, "reasons": ["3 visits over 2 days", "..."]}
 ```
+
+Every event batch, enquiry and chat message rescores its visitor, so each `visitor_update` carries the latest
+score. `score_update` follows only when the label changed (use it for "new Hot lead" alerts). After
+`POST /scoring/rescore` the server sends a fresh `snapshot`.
 
 `VisitorOut` fields: `id`, `site`, `first_seen`, `last_seen`, `session_count`, `page_views`, `event_count`,
 `lead_count`, `chat_count`, `last_path`, `last_ip`, `device`, `automation_hints`, `profile`, `label`,
-`test_label` (`genuine` / `junk` / `bot` on test sessions, otherwise `null`).
-`automation_hints` lists raw signals (`webdriver`, `automation_user_agent`, `no_browser_languages`,
+`test_label` (`genuine` / `junk` / `bot` on test sessions, otherwise `null`) and `score` (section 6, `null` until
+scored). `automation_hints` lists raw signals (`webdriver`, `automation_user_agent`, `no_browser_languages`,
 `no_user_agent`); it is not a verdict.
 
-Planned for Week 2: `{"type": "score_update", "visitor_id": "...", "label": "Hot", "intent_score": 82, "reasons": [...]}`.
+## 6. Scores and labels
 
-## 6. Labels (Week 2, to agree)
+`label` is one of `Bot`, `Junk`, `Review`, `Cold`, `Warm`, `Hot` (the rules are in `LEADOPS_PLAN.md`, Week 2
+Build Plan, and `backend/app/scoring/combine.py`).
 
-`label` is one of `Bot`, `Junk`, `Cold`, `Warm`, `Hot`, `Review` (see `LEADOPS_PLAN.md`). The `scores` table already
-has `label`, `human_prob` (0-1), `intent_score` (0-100), `reasons` (list of strings) and `model_version`.
+`VisitorOut.score`:
+
+```json
+{
+  "label": "Hot", "intent_score": 82, "human_prob": 0.998, "visitor_type": null,
+  "reasons": ["Checked the EMI on a ₹85 L home", "Downloaded the 3 BHK floor plan", "2 visits over 2 days"],
+  "summary": "Hot: Checked the EMI on a ₹85 L home; downloaded the 3 BHK floor plan; 2 visits over 2 days",
+  "model_version": "lgbm-20261106-a53bb8", "scored_at": "2026-11-06T15:04:05Z"
+}
+```
+
+- **human_prob**: 0-1 from the ML human check (LightGBM), `model_version` says which model (`fallback` when no
+  model file is loaded). **intent_score**: 0-100 points for buying signals. **reasons**: up to five, most
+  important first. **visitor_type**: `end_buyer` / `investor` / `tenant` / `broker` / `spam` once the visitor's
+  messages have been classified (Part 6), otherwise `null`.
+
+`VisitorDetailOut.score_detail` (only in `GET /visitors/{id}`):
+
+```json
+{
+  "signals": [{"code": "honeypot", "layer": "bot", "strength": "certain", "reason": "Filled in the hidden form field..."}],
+  "human": {"prob": 0.004, "source": "model",
+            "factors": [{"feature": "mouse_px_per_move", "label": "size of each mouse jump", "value": 138.8,
+                         "contribution": 2.1, "towards": "bot"}]},
+  "intent": {"score": 82, "points": [{"signal": "emi", "points": 12, "detail": "Checked the EMI on a ₹85 L home"}]},
+  "visitor_type": null,
+  "thresholds": {"bot": 0.2, "review": 0.5}
+}
+```
+
+`factors` are SHAP values from the model (log-odds, positive pushes towards "bot"), the eight strongest. The
+`scores` table keeps every label change: `label`, `human_prob`, `intent_score`, `reasons`, `model_version`.

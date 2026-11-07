@@ -7,6 +7,7 @@ a *visitor record* (backend/app/scoring/features.py), so training and live scori
     python ml/simulator.py                                    # 200 bot, 100 junk, 200 genuine -> ml/data/sessions.jsonl
     python ml/simulator.py --bots 20 --junk 10 --genuine 20 --out ml/data/small.jsonl
     python ml/simulator.py --send http://localhost:8000 --bots 5 --junk 3 --genuine 4
+    python ml/simulator.py --send http://localhost:8000 --report --seed 7   # send, then print how each kind was labelled
 
 Labels and kinds:
     bot      scraper (opens many pages in seconds), slow_scraper (a few seconds per page and no mouse at all),
@@ -93,7 +94,8 @@ def own_ip(rng: random.Random) -> str:
 
 
 def human_ip(rng: random.Random) -> str:
-    return rng.choice(SHARED_IPS) if rng.random() < 0.2 else own_ip(rng)
+    """30% of people browse from an address shared with many others (college, office, mobile network)."""
+    return rng.choice(SHARED_IPS) if rng.random() < 0.3 else own_ip(rng)
 
 
 def proxy_ip(rng: random.Random) -> str:
@@ -261,6 +263,8 @@ def human_context(rng: random.Random, mobile: bool, *, nri: bool = False, privac
     }  # fmt: skip
     if privacy:  # fingerprinting protection (Firefox, Tor Browser): UTC, 2 cores, a window-sized screen
         context.update(timezone="UTC", hardware_concurrency=2, languages=1, screen=context["viewport"])
+    elif not mobile and rng.random() < 0.05:  # full-screen browsing (F11) or a kiosk: the window fills the screen
+        context["viewport"] = context["screen"]
     return context
 
 
@@ -276,7 +280,7 @@ def bot_context(rng: random.Random) -> dict:
 def stealth_context(rng: random.Random) -> dict:
     """A bot copying a real Indian desktop browser; it often keeps Playwright's window-equals-screen default."""
     context = human_context(rng, False)
-    if rng.random() < 0.6:
+    if rng.random() < 0.5:
         context["viewport"] = context["screen"]
     context.update(languages=2, hardware_concurrency=rng.choice([4, 8]))
     return context
@@ -345,7 +349,7 @@ def make_bot(rng: random.Random) -> Visitor:
 
     ua = rng.choice(UA_BOT) if rng.random() < 0.6 else rng.choice(UA_DESKTOP)  # some bots copy a real browser's UA
     visitor = Visitor(rng, "bot", kind, user_agent=ua, context=bot_context(rng))
-    visit = visitor.visit(rng.choice(BOT_IPS))
+    visit = visitor.visit(rng.choice(BOT_IPS) if rng.random() < 0.6 else proxy_ip(rng))
     if kind == "scraper":
         visit.robot_page("/", rng.uniform(0.2, 1.0))
         scroll = rng.random() < 0.3
@@ -558,6 +562,53 @@ def send(visitor: Visitor, api: str, *, include_chat: bool) -> None:
             post(f"{api}/leads", payload, user_agent=visitor.user_agent, ip=lead["ip"])
 
 
+def get_json(url: str):
+    with urllib.request.urlopen(url, timeout=15) as response:
+        return json.loads(response.read())
+
+
+def report(visitors: list[Visitor], api: str) -> None:
+    """How the backend labelled each kind of simulated visitor: the quick end-to-end check."""
+    labels: dict[str, str | None] = {}
+    for offset in range(0, 100_000, 500):
+        page = get_json(f"{api}/visitors?limit=500&offset={offset}")
+        labels.update({item["id"]: item.get("label") for item in page})
+        if len(page) < 500:
+            break
+    by_contact: dict[tuple, str] = {}  # enquiries posted straight to the API get a visitor ID from the backend
+    for offset in range(0, 100_000, 500):
+        page = get_json(f"{api}/leads?limit=500&offset={offset}")
+        by_contact.update({(item["name"], item["phone"]): item["visitor_id"] for item in page})
+        if len(page) < 500:
+            break
+
+    names = ["Bot", "Junk", "Review", "Cold", "Warm", "Hot"]
+    table: dict[str, dict[str, int]] = {}
+    for visitor in visitors:
+        visitor_id = visitor.visitor_id
+        if not any(visit.events for visit in visitor.visits):
+            first = next((lead for visit in visitor.visits for lead in visit.leads), None)
+            visitor_id = by_contact.get((first["name"], first["phone"])) if first else None
+        label = labels.get(visitor_id) or "-"
+        row = table.setdefault(f"{visitor.label}/{visitor.kind}", {})
+        row[label] = row.get(label, 0) + 1
+
+    print("\nHow the backend labelled them:")
+    print(f"  {'':22}" + "".join(f"{name:>8}" for name in [*names, '-']))
+    for kind in sorted(table):
+        print(f"  {kind:22}" + "".join(f"{table[kind].get(name, 0):>8}" for name in [*names, "-"]))
+
+    def share(prefix: str, good: set[str]) -> str:
+        rows = [row for kind, row in table.items() if kind.startswith(prefix)]
+        total = sum(sum(row.values()) for row in rows)
+        hits = sum(count for row in rows for name, count in row.items() if name in good)
+        return f"{hits}/{total}"
+
+    print(f"  Bots filtered out (Bot or Junk): {share('bot', {'Bot', 'Junk'})}; junk filtered out: "
+          f"{share('junk', {'Bot', 'Junk'})}; genuine buyers kept (not Bot or Junk): "
+          f"{share('genuine', {'Review', 'Cold', 'Warm', 'Hot'})}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Generate labelled bot / junk / genuine visitors for LeadOps.")
     parser.add_argument("--bots", type=int, default=200)
@@ -567,6 +618,7 @@ def main() -> int:
     parser.add_argument("--out", default=str(ROOT / "ml" / "data" / "sessions.jsonl"), help="JSONL file to write")
     parser.add_argument("--send", metavar="API_URL", help="also send the visitors to a running backend, e.g. http://localhost:8000")
     parser.add_argument("--chat", action="store_true", help="with --send, also send chat messages (may call the backend's LLM)")
+    parser.add_argument("--report", action="store_true", help="with --send, print how the backend labelled each kind")
     args = parser.parse_args()
 
     rng = random.Random(args.seed)
@@ -589,7 +641,9 @@ def main() -> int:
     print(f"Wrote {len(visitors)} visitors to {out} ({counts['bot']} bot, {counts['junk']} junk, {counts['genuine']} genuine)")
 
     if args.send:
-        api = args.send.rstrip("/")
+        # On Windows, "localhost" tries IPv6 first and waits about 2 seconds per request before falling back to
+        # IPv4, where uvicorn listens. 127.0.0.1 goes straight there.
+        api = args.send.rstrip("/").replace("://localhost", "://127.0.0.1")
         try:
             for visitor in visitors:
                 send(visitor, api, include_chat=args.chat)
@@ -597,6 +651,8 @@ def main() -> int:
             print(f"Couldn't send to {api}: {error}. Is the backend running? (cd backend; uvicorn app.main:app)", file=sys.stderr)
             return 1
         print(f"Sent them to {api}. Watch them on the dashboard: http://localhost:5173/dashboard")
+        if args.report:
+            report(visitors, api)
     return 0
 
 

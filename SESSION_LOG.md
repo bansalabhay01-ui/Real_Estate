@@ -3,17 +3,17 @@
 A short diary of LeadOps work sessions, newest first. Claude saves each session by itself: whenever a piece of work is finished, and at the start of the next session if the last one wasn't saved. Each save updates this file, commits, and pushes to GitHub.
 
 ## Current status
-_Last updated: 2026-11-06_
+_Last updated: 2026-11-07_
 
-- **Phase:** Week 2 (Intelligence, 6–13 Nov) in progress: Parts 1 and 2 of 6 done. Deadline about 30 Nov 2026.
-- **Done:** the Week 1 foundation (demo property site, tracking SDK, FastAPI backend, a basic property assistant in English, Hinglish and Hindi, the live sales dashboard, the traffic simulator, the shared contracts draft) and the Week 2 build plan ("Week 2 Build Plan" at the end of `LEADOPS_PLAN.md`). Week 2 Part 1: tester links that label real test sessions, and same-Wi-Fi testing. Part 2: simulator v2, the shared visitor features and the bot/junk rules. 77 tests pass. Roughly 38% of the whole plan.
-- **Next:** Week 2 Part 3: the LightGBM model, intent score, labels and reasons. Classmates can start test sessions now (README, "Collecting real test sessions").
+- **Phase:** Week 2 (Intelligence, 6–13 Nov) in progress: Parts 1-3 of 6 done. Deadline about 30 Nov 2026.
+- **Done:** the Week 1 foundation (demo property site, tracking SDK, FastAPI backend, a basic property assistant in English, Hinglish and Hindi, the live sales dashboard, the traffic simulator, the shared contracts draft) and the Week 2 build plan ("Week 2 Build Plan" at the end of `LEADOPS_PLAN.md`). Week 2 Part 1: tester links that label real test sessions, and same-Wi-Fi testing. Part 2: simulator v2, the shared visitor features and the bot/junk rules. Part 3: the LightGBM human check with SHAP, intent points, labels and reasons, scored live on every event. 87 tests pass. Roughly 45% of the whole plan.
+- **Next:** Week 2 Part 4: dashboard v1 with label badges, intent bars, filters and the "Why this label" panel. Classmates can start test sessions now (README, "Collecting real test sessions"); the real test set is still empty.
 - **Blocked:** nothing. The assistant's LLM replies haven't been tried with a real API key yet (template replies work).
 - **Code:** https://github.com/bansalabhay01-ui/Real_Estate (branch `main`)
 
 ---
 
-## 2026-11-06 · bansalabhay01-ui · Week 2 plan, Parts 1-2 (tester link, features and rules)
+## 2026-11-06 · bansalabhay01-ui · Week 2 plan, Parts 1-3 (tester link, features and rules, model and labels)
 
 **Done**
 - Wrote the Week 2 build plan as a new section at the end of `LEADOPS_PLAN.md`. It has six parts: tester link for real sessions, simulator v2 + features + rules, LightGBM model + intent score + labels + reasons, dashboard v1 with scores, Playwright bots, and LLM extraction + visitor type. It also lists the contract additions, new files, new packages, changes from the main plan and the checks.
@@ -30,13 +30,22 @@ _Last updated: 2026-11-06_
   - `ml/simulator.py` v2 writes visitor records (several visits per visitor) and adds stealth bots, slow scrapers, repeat visits, NRI buyers, autofill, privacy browsers, ad blockers and shared IPs.
   - `merge_profile` moved from `ai/assistant.py` to `ai/extract.py`, next to the new `profile_from_messages`.
   - New `backend/tests/test_scoring.py`: 40 tests, including live-vs-training feature parity and "simulated genuine buyers never trip a certain signal". 77 tests pass.
+- **Part 3, model and labels:**
+  - `ml/train.py` trains the LightGBM human check on 2,000 simulated visitors, whole and cut short, tunes the cut-offs (they can only get more careful than 0.2 / 0.5) and measures the whole engine on unseen simulated visitors and on the real test set (tester-link visitors in the database). It saves `backend/data/model/bot_model.txt` and `model_info.json`, now committed (model `lgbm-20261106-a53bb8`).
+  - `scoring/model.py` gives `human_prob` plus SHAP values from LightGBM's `pred_contrib`, with a hand-made fallback formula if the model is missing. `scoring/combine.py` holds the intent points (out of 100) and the label order from the plan. `scoring/explain.py` writes the plain-language reasons and summary line. `scoring/engine.py` rescores a visitor after every event batch, enquiry and chat message, saves the score on the visitor, keeps label changes in `scores` and sends `score_update`.
+  - API: `VisitorOut.score`, `VisitorDetailOut.score_detail`, `LeadOut.label` and `checks`, `GET /visitors?label=&sort=intent`, `/stats` labels, `POST /scoring/rescore`, `/health` model version. `docs/CONTRACTS.md` (section 6) and the README ("Scoring") updated.
+  - Database: new nullable columns on `visitors` (`label`, `intent_score`, `human_prob`, `score`, `scored_at`, `visitor_type`). `db.init_db()` now adds new columns to existing databases at startup, so nobody has to delete theirs.
+  - `python ml/simulator.py --send URL --report` prints how the backend labelled each kind.
+  - Checked: 87 tests pass and the frontend builds. Through the live API, 500 fresh simulated visitors (seed 7) were sorted in 34 s: 200/200 bots and 100/100 junk filtered out, 200/200 genuine buyers kept (4 in Review). The existing dashboard shows the labels.
 
 **Next**
-- Part 3: the LightGBM model, intent score, labels and reasons.
+- Part 4: dashboard v1 with scores.
 
 **Notes**
 - The user said "continue" without answering the plan's two decisions, so the plan's recommendations apply: the contract additions as planned (written into `docs/CONTRACTS.md` as each part lands) and same-Wi-Fi testing.
 - Teammates: run `pip install -r requirements.txt` in `backend/` again for the new packages, and `pip install -r ml/requirements.txt` (from the repo root, into the same venv) to train or run the bots.
+- Simulated results are near perfect (AUC 1.0) because the simulator is easy to separate; the real test set is the honest number. Two simulator quirks were fixed so the model leans on behaviour: shared IPs (now 30% of people, and bots often use proxies) and full-screen windows (5% of desktop users).
+- Problems hit: LightGBM's model file lists tree sizes in bytes, so Windows line endings broke loading (the trainer now writes `\n`, the loader normalises). On Windows, `localhost` costs about 2 s per request from Python (IPv6 first), so the simulator now sends to `127.0.0.1`. The simulator's console output is plain ASCII, because Windows pipes use the old code page.
 - Plan decisions: SHAP values come from LightGBM's own `pred_contrib` (no `shap` package on the server). The LangGraph agent moves to the start of Week 3. Many visitors from one IP, a fast form, a missing SDK or a disposable email never make a visitor `Bot` or `Junk` on their own. International (NRI) phone numbers are allowed.
 - Found while planning: the enquiry form's timer starts at the first change, so browser autofill can make a real buyer look fast. The floor-plan download's scripted `link.click()` happens on a detached link, so the SDK never records it as a scripted click.
 - Edge and Chrome are installed on this laptop, so the Playwright bots need no browser download here.

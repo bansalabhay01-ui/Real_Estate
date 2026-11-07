@@ -5,6 +5,7 @@ from collections.abc import Callable
 from datetime import timedelta
 from typing import TypeVar
 
+from pydantic import ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -15,13 +16,16 @@ from .schemas import (
     ChatMessageOut,
     EventBatchIn,
     EventOut,
+    LeadCheckOut,
     LeadIn,
     LeadOut,
+    ScoreOut,
     SessionOut,
     StatsOut,
     VisitorDetailOut,
     VisitorOut,
 )
+from .scoring.rules import lead_checks
 from .utils import automation_hints, device_from_ua, utcnow
 
 DETAIL_EVENT_LIMIT = 200
@@ -41,6 +45,23 @@ def run_in_session(work: Callable[[Session], T]) -> T:
     raise AssertionError("unreachable")
 
 
+def score_out(saved: dict | None) -> ScoreOut | None:
+    """The saved score without its full breakdown (that comes with GET /visitors/{id} as score_detail)."""
+    if not saved:
+        return None
+    try:
+        return ScoreOut.model_validate({key: value for key, value in saved.items() if key != "detail"})
+    except ValidationError:  # saved by an older version: rescoring fixes it
+        return None
+
+
+def lead_out(lead: Lead, label: str | None = None) -> LeadOut:
+    fields = {"phone": lead.phone, "email": lead.email, "name": lead.name, "message": lead.message,
+              "honeypot": lead.honeypot, "form_fill_ms": lead.form_fill_ms}
+    checks = [LeadCheckOut(**check) for check in lead_checks(fields)]
+    return LeadOut.model_validate(lead).model_copy(update={"label": label, "checks": checks})
+
+
 def visitor_out(visitor: Visitor) -> VisitorOut:
     return VisitorOut(
         id=visitor.id,
@@ -57,7 +78,9 @@ def visitor_out(visitor: Visitor) -> VisitorOut:
         device=device_from_ua(visitor.user_agent),
         automation_hints=automation_hints(visitor.user_agent, visitor.context or {}),
         profile=visitor.profile or {},
+        label=visitor.label,
         test_label=(visitor.context or {}).get("test_label"),
+        score=score_out(visitor.score),
     )
 
 
@@ -160,15 +183,22 @@ def store_lead(payload: LeadIn, ip: str | None, user_agent: str | None) -> tuple
         visitor.last_seen = now
         visitor.last_ip = ip or visitor.last_ip
         db.commit()
-        return LeadOut.model_validate(lead), visitor_out(visitor)
+        return lead_out(lead, visitor.label), visitor_out(visitor)
 
     return run_in_session(work)
 
 
-def list_visitors(limit: int = 50, offset: int = 0) -> list[VisitorOut]:
+def list_visitors(limit: int = 50, offset: int = 0, *, label: str | None = None, sort: str = "recent") -> list[VisitorOut]:
+    """sort: "recent" (latest activity first) or "intent" (highest intent score first)."""
+    query = select(Visitor)
+    if label:
+        query = query.where(Visitor.label == label)
+    if sort == "intent":
+        query = query.order_by(Visitor.intent_score.desc().nulls_last(), Visitor.last_seen.desc())
+    else:
+        query = query.order_by(Visitor.last_seen.desc())
     with SessionLocal() as db:
-        rows = db.scalars(select(Visitor).order_by(Visitor.last_seen.desc()).limit(limit).offset(offset))
-        return [visitor_out(row) for row in rows]
+        return [visitor_out(row) for row in db.scalars(query.limit(limit).offset(offset))]
 
 
 def visitor_detail(visitor_id: str) -> VisitorDetailOut | None:
@@ -190,8 +220,9 @@ def visitor_detail(visitor_id: str) -> VisitorDetailOut | None:
             context=visitor.context or {},
             sessions=[SessionOut.model_validate(row) for row in sessions],
             events=[EventOut.model_validate(row) for row in events],
-            leads=[LeadOut.model_validate(row) for row in leads],
+            leads=[lead_out(row, visitor.label) for row in leads],
             chat=[ChatMessageOut.model_validate(row) for row in chat],
+            score_detail=(visitor.score or {}).get("detail"),
         )
 
 
@@ -204,16 +235,25 @@ def dashboard_stats(active_minutes: int = 2) -> StatsOut:
             active_now=db.scalar(count.where(Visitor.last_seen >= cutoff)) or 0,
             leads=db.scalar(select(func.count()).select_from(Lead)) or 0,
             chatting_visitors=db.scalar(count.where(Visitor.chat_count > 0)) or 0,
+            labels=dict(
+                db.execute(
+                    select(Visitor.label, func.count()).where(Visitor.label.is_not(None)).group_by(Visitor.label)
+                ).all()
+            ),
         )
 
 
 def list_leads(limit: int = 50, offset: int = 0) -> list[LeadOut]:
     with SessionLocal() as db:
-        rows = db.scalars(select(Lead).order_by(Lead.id.desc()).limit(limit).offset(offset))
-        return [LeadOut.model_validate(row) for row in rows]
+        rows = db.execute(
+            select(Lead, Visitor.label).join(Visitor, Visitor.id == Lead.visitor_id).order_by(Lead.id.desc()).limit(limit).offset(offset)
+        ).all()
+        return [lead_out(lead, label) for lead, label in rows]
 
 
 def get_lead(lead_id: int) -> LeadOut | None:
     with SessionLocal() as db:
         lead = db.get(Lead, lead_id)
-        return LeadOut.model_validate(lead) if lead else None
+        if lead is None:
+            return None
+        return lead_out(lead, db.scalar(select(Visitor.label).where(Visitor.id == lead.visitor_id)))
