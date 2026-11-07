@@ -82,6 +82,27 @@ foreign numbers, browser autofill, privacy browsers and ad blockers. The same `-
 `--send URL` also posts the visitors to a running backend. `--chat` sends their chat messages too, which calls your
 LLM if a key is set.
 
+## Playwright bots
+
+Real bots for testing and for the live attack demo (`ml/bots/run_bots.py`). Start the backend and the site
+first, then:
+
+```bash
+backend\.venv\Scripts\python ml/bots/run_bots.py --api http://localhost:8000   # each bot once, prints its label
+backend\.venv\Scripts\python ml/bots/run_bots.py --kind stealth --headed      # watch one work (for the demo)
+```
+
+| Bot | What it does | What catches it |
+|---|---|---|
+| `naive` | fills in every field, the hidden honeypot too, and submits in a second | the rules: honeypot, `navigator.webdriver` |
+| `stealth` | hides `webdriver`, uses a normal user agent, moves the mouse, scrolls, types with pauses, skips the honeypot | only its behaviour: the ML model ("the mouse jumped about 99 pixels at a time") |
+| `scraper` | opens all 18 listings in about 10 seconds and copies the prices | the rules: `navigator.webdriver`, a headless user agent |
+
+They open the site through a `lo_test=bot` tester link, so their visits join the real test set that `ml/train.py`
+reports on. They drive the Edge or Chrome you already have; without either (Mac/Linux), run
+`backend/.venv/bin/python -m playwright install chromium` once. `--count 5` repeats each bot, `--slow-mo 300`
+slows a headed bot down for an audience.
+
 ## Scoring
 
 Every event batch, enquiry and chat message rescores its visitor, in a few milliseconds:

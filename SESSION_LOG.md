@@ -5,15 +5,15 @@ A short diary of LeadOps work sessions, newest first. Claude saves each session 
 ## Current status
 _Last updated: 2026-11-07_
 
-- **Phase:** Week 2 (Intelligence, 6–13 Nov) in progress: Parts 1-4 of 6 done. Deadline about 30 Nov 2026.
-- **Done:** the Week 1 foundation (demo property site, tracking SDK, FastAPI backend, a basic property assistant in English, Hinglish and Hindi, the live sales dashboard, the traffic simulator, the shared contracts draft) and the Week 2 build plan ("Week 2 Build Plan" at the end of `LEADOPS_PLAN.md`). Week 2 Part 1: tester links that label real test sessions, and same-Wi-Fi testing. Part 2: simulator v2, the shared visitor features and the bot/junk rules. Part 3: the LightGBM human check with SHAP, intent points, labels and reasons, scored live on every event. Part 4: the dashboard shows labels, intent, filters with counts and a "Why this label" panel, with Hot alerts. 87 tests pass. Roughly 50% of the whole plan.
-- **Next:** Week 2 Part 5: the Playwright bots (naive form bot, stealth form bot, scraper). Classmates can start test sessions now (README, "Collecting real test sessions"); the real test set is still empty.
-- **Blocked:** nothing. The assistant's LLM replies haven't been tried with a real API key yet (template replies work).
+- **Phase:** Week 2 (Intelligence, 6–13 Nov) in progress: Parts 1-5 of 6 done. Deadline about 30 Nov 2026.
+- **Done:** the Week 1 foundation (demo property site, tracking SDK, FastAPI backend, a basic property assistant in English, Hinglish and Hindi, the live sales dashboard, the traffic simulator, the shared contracts draft) and the Week 2 build plan ("Week 2 Build Plan" at the end of `LEADOPS_PLAN.md`). Week 2 Part 1: tester links that label real test sessions, and same-Wi-Fi testing. Part 2: simulator v2, the shared visitor features and the bot/junk rules. Part 3: the LightGBM human check with SHAP, intent points, labels and reasons, scored live on every event. Part 4: the dashboard shows labels, intent, filters with counts and a "Why this label" panel, with Hot alerts. Part 5: three real Playwright bots, all caught (the stealth one by the ML model alone). 87 tests pass. Roughly 53% of the whole plan.
+- **Next:** Week 2 Part 6: LLM detail extraction and visitor-type classification. Classmates can start test sessions now (README, "Collecting real test sessions"); the real test set has no human sessions yet.
+- **Blocked:** pushing to GitHub needs the user to sign in again (Git Credential Manager asked on 2026-11-07); the Part 4 and Part 5 commits are saved locally until then. The assistant's LLM replies haven't been tried with a real API key yet (template replies work).
 - **Code:** https://github.com/bansalabhay01-ui/Real_Estate (branch `main`)
 
 ---
 
-## 2026-11-06 · bansalabhay01-ui · Week 2 plan, Parts 1-4 (tester link, features and rules, model and labels, dashboard)
+## 2026-11-06 · bansalabhay01-ui · Week 2 plan, Parts 1-5 (tester link, features and rules, model and labels, dashboard, bots)
 
 **Done**
 - Wrote the Week 2 build plan as a new section at the end of `LEADOPS_PLAN.md`. It has six parts: tester link for real sessions, simulator v2 + features + rules, LightGBM model + intent score + labels + reasons, dashboard v1 with scores, Playwright bots, and LLM extraction + visitor type. It also lists the contract additions, new files, new packages, changes from the main plan and the checks.
@@ -43,9 +43,10 @@ _Last updated: 2026-11-07_
   - Enquiries table: label column and the backend's checks. A "new hot lead" alert with View and Dismiss. Stat tiles: Visitors, Active now, Enquiries, Hot right now, Filtered out.
   - The model now has monotone constraints (`ml/train.py`), so a bot signal can only push towards "bot" and SHAP bars read sensibly; importance is spread across behaviour features. Retrained as `lgbm-20261107-49dc13`; simulated results unchanged.
   - Checked: 87 tests pass, the frontend builds, and a headless Edge check passed 10/10 (badges, Hot filter rows = Hot count, intent sort, Hot alert, score panel, enquiry labels, no sideways scroll at phone width, no page errors). Screenshots looked right at desktop and phone width.
+- **Part 5, Playwright bots:** `ml/bots/run_bots.py` with three bots (naive form bot, stealth form bot, scraper) that drive the installed Edge or Chrome; `--headed` for the live demo, `--api` prints each bot's label. Every run uses a `lo_test=bot` tester link, so the bots join the real test set. Checked: 9 runs (3 of each), all labelled Bot. The naive bot and the scraper were caught by the rules (honeypot, webdriver, headless user agent); the stealth bot by the ML model alone ("under 1% likely to be a person; the mouse jumped about 63-99 pixels at a time"). `ml/train.py`'s real-test-set report works: 9/9 tester bots caught. README: "Playwright bots".
 
 **Next**
-- Part 5: the Playwright bots.
+- Part 6: LLM detail extraction and visitor-type classification.
 
 **Notes**
 - The user said "continue" without answering the plan's two decisions, so the plan's recommendations apply: the contract additions as planned (written into `docs/CONTRACTS.md` as each part lands) and same-Wi-Fi testing.
