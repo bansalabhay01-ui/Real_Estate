@@ -38,6 +38,17 @@ from app.scoring.features import MODEL_FEATURES, add_network_counts, cut_record,
 from app.scoring.model import DEFAULT_THRESHOLDS, INFO_FILE_NAME, MODEL_DIR, MODEL_FILE_NAME, HumanModel  # noqa: E402
 
 LABELS = ["Bot", "Junk", "Review", "Cold", "Warm", "Hot"]
+# Monotone constraints keep the model's logic sensible and its SHAP explanations intuitive: a bot signal can only
+# ever push towards "bot" (+1), a human one only towards "person" (-1). Features that cut both ways stay free (0):
+# lots of pages can be a scraper or a broker, and a scroll straight to the bottom is a script, not a person.
+MONOTONE = {
+    "webdriver": 1, "automation_ua": 1, "no_user_agent": 1, "timezone_utc": 1, "viewport_matches_screen": 1,
+    "touch_mismatch": 1, "pages_per_minute": 1, "fast_pages": 1, "mouse_px_per_move": 1, "untrusted_clicks": 1,
+    "honeypot": 1, "lead_without_pageviews": 1, "ip_visitors": 1,
+    "browser_languages": -1, "hardware_concurrency": -1, "duration_s": -1, "median_dwell_s": -1,
+    "activity_coverage": -1, "mouse_moves_per_min": -1, "touches_per_min": -1, "trusted_clicks": -1,
+    "event_gap_cv": -1, "min_fill_s": -1, "seconds_to_first_lead": -1,
+}  # fmt: skip
 PARAMS = {
     "objective": "binary", "learning_rate": 0.05, "num_leaves": 15, "min_data_in_leaf": 10, "feature_fraction": 0.8,
     "bagging_fraction": 0.8, "bagging_freq": 1, "lambda_l2": 1.0, "seed": 7, "deterministic": True,
@@ -154,6 +165,7 @@ def main() -> int:
           f"checking on {len(test)} unseen visitors ({len(x_test)} rows)")
 
     features = list(MODEL_FEATURES)
+    PARAMS["monotone_constraints"] = [MONOTONE.get(name, 0) for name in features]
     train_set = lgb.Dataset(np.array(x_train, dtype=float), label=y_train, feature_name=features, free_raw_data=False)
     test_set = lgb.Dataset(np.array(x_test, dtype=float), label=y_test, reference=train_set)
     booster = lgb.train(PARAMS, train_set, num_boost_round=400, valid_sets=[test_set],

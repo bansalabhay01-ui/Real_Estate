@@ -59,15 +59,18 @@ Open http://localhost:5173 for the demo site and http://localhost:5173/dashboard
 ## Try it
 
 1. Open the dashboard in one window and the demo site in another, then browse. You appear on the dashboard within
-   seconds; click your row to see your pages, scrolls and clicks in order.
+   seconds with a label and an intent score that climb as you use the EMI calculator, the floor plan and the
+   assistant. Click your row for "Why this label" (the reasons, the human check's SHAP factors and the intent
+   points), then your pages, scrolls and clicks in order. The buttons above the table filter by label.
 2. Open http://localhost:8000/sdk/demo.html, a plain HTML page with the same script tag. That visit appears too.
    To show it working on a different website, serve it from another address:
    `python -m http.server 5500 --directory sdk`, then open http://localhost:5500/demo.html.
 3. Ask the assistant "3BHK under 90L in Pune?" or "Pune mein 90 lakh tak 3BHK chahiye". It answers from the
    listings and saves the budget, BHK and city on the visitor.
-4. Send an enquiry from a property page. The dashboard shows how fast the form was filled in and whether the
-   hidden honeypot field was filled.
-5. Send simulated traffic: `python ml/simulator.py --send http://localhost:8000 --bots 20 --junk 5 --genuine 10`
+4. Send an enquiry from a property page. The dashboard shows its label and its checks: phone, email, name, message,
+   the hidden honeypot field and how fast the form was filled in.
+5. Send simulated traffic: `python ml/simulator.py --send http://localhost:8000 --bots 20 --junk 5 --genuine 10 --report`.
+   Watch the dashboard sort it, with an alert for each new Hot lead.
 
 ## Simulator
 

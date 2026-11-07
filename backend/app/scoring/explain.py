@@ -107,10 +107,12 @@ def reasons_for(label: str, *, signals: list[Signal], check: HumanCheck, feature
     junk = [s for s in signals if s.layer == JUNK]
     buying = [point.detail for point in sorted(points, key=lambda point: -point.points)]
     type_reason = [visitor_type["reason"]] if visitor_type and visitor_type.get("reason") else []
-    unsure = f"Only {check.human_prob:.0%} likely to be a person, judging by how it browses"
+    chance = "under 1%" if check.human_prob < 0.01 else f"{check.human_prob:.0%}"
+    bot_like = f"Behaves like a bot ({chance} likely to be a person)"
+    unsure = f"Not sure it's a person ({chance} likely, judging by how it browses)"
 
     if label == "Bot":
-        found = _by_strength(bot) or [unsure]
+        found = _by_strength(bot) or [bot_like]
         found += bot_reasons_from_model(check, features)
     elif label == "Junk":
         found = _by_strength(junk) + type_reason

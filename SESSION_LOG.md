@@ -5,15 +5,15 @@ A short diary of LeadOps work sessions, newest first. Claude saves each session 
 ## Current status
 _Last updated: 2026-11-07_
 
-- **Phase:** Week 2 (Intelligence, 6–13 Nov) in progress: Parts 1-3 of 6 done. Deadline about 30 Nov 2026.
-- **Done:** the Week 1 foundation (demo property site, tracking SDK, FastAPI backend, a basic property assistant in English, Hinglish and Hindi, the live sales dashboard, the traffic simulator, the shared contracts draft) and the Week 2 build plan ("Week 2 Build Plan" at the end of `LEADOPS_PLAN.md`). Week 2 Part 1: tester links that label real test sessions, and same-Wi-Fi testing. Part 2: simulator v2, the shared visitor features and the bot/junk rules. Part 3: the LightGBM human check with SHAP, intent points, labels and reasons, scored live on every event. 87 tests pass. Roughly 45% of the whole plan.
-- **Next:** Week 2 Part 4: dashboard v1 with label badges, intent bars, filters and the "Why this label" panel. Classmates can start test sessions now (README, "Collecting real test sessions"); the real test set is still empty.
+- **Phase:** Week 2 (Intelligence, 6–13 Nov) in progress: Parts 1-4 of 6 done. Deadline about 30 Nov 2026.
+- **Done:** the Week 1 foundation (demo property site, tracking SDK, FastAPI backend, a basic property assistant in English, Hinglish and Hindi, the live sales dashboard, the traffic simulator, the shared contracts draft) and the Week 2 build plan ("Week 2 Build Plan" at the end of `LEADOPS_PLAN.md`). Week 2 Part 1: tester links that label real test sessions, and same-Wi-Fi testing. Part 2: simulator v2, the shared visitor features and the bot/junk rules. Part 3: the LightGBM human check with SHAP, intent points, labels and reasons, scored live on every event. Part 4: the dashboard shows labels, intent, filters with counts and a "Why this label" panel, with Hot alerts. 87 tests pass. Roughly 50% of the whole plan.
+- **Next:** Week 2 Part 5: the Playwright bots (naive form bot, stealth form bot, scraper). Classmates can start test sessions now (README, "Collecting real test sessions"); the real test set is still empty.
 - **Blocked:** nothing. The assistant's LLM replies haven't been tried with a real API key yet (template replies work).
 - **Code:** https://github.com/bansalabhay01-ui/Real_Estate (branch `main`)
 
 ---
 
-## 2026-11-06 · bansalabhay01-ui · Week 2 plan, Parts 1-3 (tester link, features and rules, model and labels)
+## 2026-11-06 · bansalabhay01-ui · Week 2 plan, Parts 1-4 (tester link, features and rules, model and labels, dashboard)
 
 **Done**
 - Wrote the Week 2 build plan as a new section at the end of `LEADOPS_PLAN.md`. It has six parts: tester link for real sessions, simulator v2 + features + rules, LightGBM model + intent score + labels + reasons, dashboard v1 with scores, Playwright bots, and LLM extraction + visitor type. It also lists the contract additions, new files, new packages, changes from the main plan and the checks.
@@ -37,9 +37,15 @@ _Last updated: 2026-11-07_
   - Database: new nullable columns on `visitors` (`label`, `intent_score`, `human_prob`, `score`, `scored_at`, `visitor_type`). `db.init_db()` now adds new columns to existing databases at startup, so nobody has to delete theirs.
   - `python ml/simulator.py --send URL --report` prints how the backend labelled each kind.
   - Checked: 87 tests pass and the frontend builds. Through the live API, 500 fresh simulated visitors (seed 7) were sorted in 34 s: 200/200 bots and 100/100 junk filtered out, 200/200 genuine buyers kept (4 in Review). The existing dashboard shows the labels.
+- **Part 4, dashboard v1:**
+  - Visitors table: label badges (an icon per label so meaning never rests on colour; Cold/Warm/Hot show 1-3 strength bars), the top reason, an intent meter, filter buttons with live counts from `/stats` and a sort by highest intent. A filtered or sorted list is fetched from the API and kept current with live updates. Columns trimmed to fit beside the side panel.
+  - Visitor panel: new "Why this label" (`frontend/src/dashboard/ScoreBreakdown.jsx`): reasons, the human check with SHAP factors as diverging bars (blueprint = towards a person, alert red = towards a bot; the pair passed the colour-blind validator), contact-detail checks and the intent points.
+  - Enquiries table: label column and the backend's checks. A "new hot lead" alert with View and Dismiss. Stat tiles: Visitors, Active now, Enquiries, Hot right now, Filtered out.
+  - The model now has monotone constraints (`ml/train.py`), so a bot signal can only push towards "bot" and SHAP bars read sensibly; importance is spread across behaviour features. Retrained as `lgbm-20261107-49dc13`; simulated results unchanged.
+  - Checked: 87 tests pass, the frontend builds, and a headless Edge check passed 10/10 (badges, Hot filter rows = Hot count, intent sort, Hot alert, score panel, enquiry labels, no sideways scroll at phone width, no page errors). Screenshots looked right at desktop and phone width.
 
 **Next**
-- Part 4: dashboard v1 with scores.
+- Part 5: the Playwright bots.
 
 **Notes**
 - The user said "continue" without answering the plan's two decisions, so the plan's recommendations apply: the contract additions as planned (written into `docs/CONTRACTS.md` as each part lands) and same-Wi-Fi testing.

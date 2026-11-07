@@ -45,5 +45,45 @@ export function describeEvent(event) {
   }
 }
 
-// An enquiry filled in faster than a person can type is a strong bot signal.
-export const FAST_FILL_MS = 3000;
+// What each label means, for the badge's tooltip and the filter row.
+export const LABEL_INFO = {
+  Hot: "Serious buyer: call first (intent over 70)",
+  Warm: "Interested: follow up (intent 40 to 70)",
+  Cold: "Just looking so far (intent under 40)",
+  Review: "Needs a person to look: mixed or uncertain signals",
+  Junk: "Filtered out: fake details, spam, a broker or not a buyer",
+  Bot: "Filtered out: automated traffic",
+};
+export const LABELS = ["Hot", "Warm", "Cold", "Review", "Junk", "Bot"];
+
+const seconds = (value) => (value < 60 ? `${value.toFixed(value < 10 ? 1 : 0)} s` : `${Math.round(value / 60)} min`);
+const yesNo = (value) => (value ? "yes" : "no");
+const FEATURE_FORMATS = {
+  activity_coverage: (value) => `${Math.round(value * 100)}%`,
+  mouse_px_per_move: (value) => `${Math.round(value)} px`,
+  mouse_moves_per_min: (value) => `${Math.round(value)} a minute`,
+  touches_per_min: (value) => `${Math.round(value)} a minute`,
+  pages_per_minute: (value) => `${value.toFixed(1)} a minute`,
+  median_dwell_s: seconds,
+  duration_s: seconds,
+  min_fill_s: seconds,
+  seconds_to_first_lead: seconds,
+  event_gap_cv: (value) => value.toFixed(2),
+  scrolls_per_page: (value) => value.toFixed(1),
+  webdriver: yesNo,
+  automation_ua: yesNo,
+  no_user_agent: yesNo,
+  timezone_utc: yesNo,
+  viewport_matches_screen: yesNo,
+  touch_mismatch: yesNo,
+  honeypot: yesNo,
+  lead_without_pageviews: yesNo,
+};
+
+// A model feature's value for this visitor, in words: "62%", "139 px", "4.2 s", "yes".
+export function formatFeature(name, value) {
+  if (value === null || value === undefined) return "unknown";
+  const format = FEATURE_FORMATS[name];
+  if (format) return format(value);
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}

@@ -68,6 +68,47 @@ export const IconCheck = (props) => (
   </Icon>
 );
 
+export const IconBot = (props) => (
+  <Icon {...props}>
+    <rect x="4" y="8" width="16" height="11" rx="2" />
+    <path d="M12 4v4M9 13v.01M15 13v.01M9.5 16h5" />
+  </Icon>
+);
+
+export const IconBan = (props) => (
+  <Icon {...props}>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="m6 6 12 12" />
+  </Icon>
+);
+
+export const IconEye = (props) => (
+  <Icon {...props}>
+    <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
+    <circle cx="12" cy="12" r="2.5" />
+  </Icon>
+);
+
+// Intent strength: 1, 2 or 3 bars (Cold, Warm, Hot), so the order shows without relying on colour.
+export function IconStrength({ level, className = "size-4" }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      {[0, 1, 2].map((step) => (
+        <rect
+          key={step}
+          x={4 + step * 6}
+          y={16 - step * 5}
+          width="4"
+          height={4 + step * 5}
+          rx="1"
+          fill="currentColor"
+          opacity={step < level ? 1 : 0.25}
+        />
+      ))}
+    </svg>
+  );
+}
+
 // A lab flask: marks test sessions opened through a tester link.
 export const IconTest = (props) => (
   <Icon {...props}>

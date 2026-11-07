@@ -31,4 +31,11 @@ export const getChatHistory = (visitorId) => request(`/chat/${encodeURIComponent
 
 export const getVisitor = (id) => request(`/visitors/${encodeURIComponent(id)}`);
 
+// { label: "Hot" | undefined, sort: "recent" | "intent", limit }
+export function getVisitors({ label, sort = "recent", limit = 200 } = {}) {
+  const params = new URLSearchParams({ sort, limit: String(limit) });
+  if (label) params.set("label", label);
+  return request(`/visitors?${params}`);
+}
+
 export const getStats = () => request("/stats");

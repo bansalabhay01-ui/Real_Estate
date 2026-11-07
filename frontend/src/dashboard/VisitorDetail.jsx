@@ -3,7 +3,8 @@ import { IconClose } from "../components/icons";
 import { getVisitor } from "../lib/api";
 import { formatClock, formatDateTime, formatPrice } from "../lib/format";
 import { describeEvent } from "./describe";
-import { LeadChecks, shortId, SignalChips } from "./Signals";
+import ScoreBreakdown from "./ScoreBreakdown";
+import { LabelBadge, LeadChecks, shortId, SignalChips } from "./Signals";
 
 const TIMELINE_LIMIT = 60;
 const LANGUAGES = { en: "English", hinglish: "Hinglish", hi: "Hindi" };
@@ -85,7 +86,7 @@ export default function VisitorDetail({ visitorId, version, onClose }) {
     return <aside className={`${panelClass} text-sm text-muted`}>Loading the visitor...</aside>;
   }
 
-  const { visitor, events, leads, chat, context, user_agent: userAgent } = detail;
+  const { visitor, events, leads, chat, context, user_agent: userAgent, score_detail: scoreDetail } = detail;
   return (
     <aside
       aria-labelledby="visitor-heading"
@@ -93,8 +94,8 @@ export default function VisitorDetail({ visitorId, version, onClose }) {
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 id="visitor-heading" className="font-wide text-lg font-semibold">
-            Visitor {shortId(visitor.id)}
+          <h2 id="visitor-heading" className="flex flex-wrap items-center gap-2 font-wide text-lg font-semibold">
+            Visitor {shortId(visitor.id)} <LabelBadge label={visitor.label} />
           </h2>
           <p className="text-sm text-muted">
             First seen {formatDateTime(visitor.first_seen)}. {visitor.session_count}{" "}
@@ -106,9 +107,12 @@ export default function VisitorDetail({ visitorId, version, onClose }) {
         </button>
       </div>
 
+      <Section title="Why this label">
+        <ScoreBreakdown score={visitor.score} detail={scoreDetail} hasEnquiry={leads.length > 0} />
+      </Section>
+
       <Section title="Signals">
         <SignalChips visitor={visitor} />
-        <p className="mt-2 text-xs text-muted">The scoring engine turns signals like these into a label.</p>
       </Section>
 
       <Section title="Buyer details from chat">
