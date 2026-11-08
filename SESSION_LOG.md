@@ -7,9 +7,26 @@ _Last updated: 2026-11-08_
 
 - **Phase:** Week 2 (Intelligence) is finished, all six parts, five days early (planned 6–13 Nov). Week 3 (Integration + Wow) is next. Deadline about 30 Nov 2026.
 - **Done:** the Week 1 foundation (demo property site, tracking SDK, FastAPI backend, a basic property assistant in English, Hinglish and Hindi, the live sales dashboard, the traffic simulator, the shared contracts draft) and all of Week 2 ("Week 2 Build Plan" in `LEADOPS_PLAN.md`): tester links for real test sessions; simulator v2, visitor features and bot/junk rules; the LightGBM human check with SHAP, intent points, labels and reasons, scored live; dashboard v1 with labels, filters, "Why this label" and Hot alerts; three real Playwright bots, all caught; LLM detail extraction and visitor-type classification (end buyer, investor, tenant, broker, spam). 110 tests pass. Roughly 56% of the whole plan.
-- **Next:** the Week 3 build plan, for the user's go-ahead. Classmates can start test sessions now (README, "Collecting real test sessions"); the real test set has no human sessions yet.
+- **Next:** the user's go-ahead on the Week 3 build plan (end of `LEADOPS_PLAN.md`) and its four decisions, then Week 3 Part 1. Classmates can start test sessions now (README, "Collecting real test sessions"); the real test set has no human sessions yet.
 - **Blocked:** the LLM features (replies, extraction, visitor type) haven't been tried with a real API key yet; template mode and the keyword rules work, and Claude's request shape matches the API reference.
 - **Code:** https://github.com/bansalabhay01-ui/Real_Estate (branch `main`)
+
+---
+
+## 2026-11-08 · bansalabhay01-ui · Part 6 saved, Week 3 plan
+
+**Done**
+- Saved the previous session, which had ended before its save: checked Week 2 Part 6 (results in the entry below), committed it and pushed. GitHub sign-in works again, so Parts 4, 5 and 6 are now on GitHub.
+- Wrote the Week 3 build plan ("Week 3 Build Plan" at the end of `LEADOPS_PLAN.md`), six parts: Simulate traffic and Run a real bot; assistant v2 (LangGraph agent, brochures, EMI, site visits, a regional language); the smart engagement trigger; the lead brief, follow-ups and sales verdicts; the consistency check and learning from verdicts; privacy (consent, retention, erasure), a mocked OTP and a dashboard passcode. It lists the contract additions, new files and packages, changes from the main plan, four decisions, team actions and the checks.
+- pip dry runs on Python 3.14 (Windows): `langgraph` 1.2.20 adds 20 packages, all ready-made wheels; `chromadb` 1.5.9 adds 57 (onnxruntime, gRPC, a Kubernetes client, OpenTelemetry), so the plan uses BM25 over Markdown brochures instead.
+
+**Next**
+- The user's go-ahead and the four decisions (consent before tracking, the regional language, the contracts, one real LLM check), then Week 3 Part 1.
+
+**Notes**
+- Claude's request shape checked against the current API reference: structured outputs in `output_config.format`, effort in `output_config.effort`, `fallbacks: "default"` with the `server-side-fallback-2026-07-01` beta, and no `temperature`.
+- `git push` works with the saved credentials; run without a terminal, Git Credential Manager prints a harmless "Cannot prompt" line first.
+- Rough LLM cost per chat message (up to three calls): about $0.03 on Claude Opus 5.5, under a tenth of a cent on Claude Haiku 5.5.
 
 ---
 

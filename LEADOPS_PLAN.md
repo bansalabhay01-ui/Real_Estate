@@ -303,3 +303,131 @@ All of them have ready-made builds for Python 3.14 on Windows (checked on 6 Nov 
 - Browsing the demo site in a normal browser: starts `Cold` and climbs to `Warm`/`Hot` with the EMI calculator, floor plan, assistant and enquiry, with reasons that match.
 - Without the model file and without an LLM key, labels still appear.
 - `npm run build` passes; the filters and the score panel work, including at phone width.
+
+---
+
+## Week 3 Build Plan (draft for review)
+Week 2 finished on 8 Nov, five days early, so Week 3 can start now instead of on 14 Nov. Nothing below is built until you say go.
+
+**Goal:** turn the scores into sales. Catch anonymous buyers before they leave, give the sales team a ready next step for every lead, and make the live demo one click.
+
+**What "done" looks like** (this is also the demo script):
+1. Press **Simulate traffic** on the dashboard: 250 visitors (200 bots, 30 junk, 20 buyers) arrive over half a minute and are sorted live, ending with a scoreboard: "200/200 bots blocked, 30/30 junk filtered, 20/20 buyers kept". Press **Run a real bot**: a browser window opens, fills in the enquiry form and lands in `Bot`.
+2. A buyer browses without leaving any details. After the EMI calculator and the floor plan, the assistant offers to send the floor plan on WhatsApp; the buyer shares a number and appears as a `Hot` lead "found by the assistant".
+3. The assistant answers "What's the payment plan at Aranya Courtyard?" from the brochure, works out the EMI with 30% down and books a site visit for Saturday morning.
+4. On the dashboard the lead opens with a three-line brief, a next step ("Call now: ..."), a WhatsApp draft in the buyer's language that opens in WhatsApp with one click, one-click site-visit booking, and Genuine / Fake / Converted buttons that the next training run learns from.
+5. Visitors are asked before they are tracked, anyone's data can be deleted, and old data expires.
+
+Same rules as Week 2: six parts, each ending with the tests passing and a quick check, then I save and push it. Every new LLM feature has a template or rule fallback, so the demo works without a key. The owner is in brackets.
+
+### Part 1: Simulate traffic and Run a real bot (B, A)
+- **`POST /demo/simulate`** (`backend/app/api/demo.py`): makes visitors with `ml/simulator.py` (200 bots, 30 junk and 20 genuine by default) and feeds them through the same code as the real API (store, score, visitor type, dashboard updates), spread over about 30 seconds so people can watch. The dashboard gets `simulation_progress` messages and a final `simulation_done` with the scoreboard: for each kind of visitor, how many got each label. One run at a time.
+- **`DELETE /demo/simulated`** removes the visitors the button made, so every rehearsal can start clean. Real and tester visitors are never touched.
+- **`POST /demo/bot`** runs one of the Playwright bots (`ml/bots/run_bots.py --headed`) on the laptop that runs the backend. It works only when the backend runs locally with the `ml/requirements.txt` packages installed; the deployed server says it isn't available there.
+- Dashboard: a **Simulate traffic** button in the header (a small dialog with the three numbers), a progress bar, the scoreboard at the end, **Clear simulated visitors**, and **Run a real bot** with a choice of naive, stealth or scraper.
+
+### Part 2: Assistant v2: LangGraph agent, brochures, EMI and site visits (C, B)
+The biggest part.
+- **`backend/app/ai/agent.py`:** the assistant becomes a LangGraph graph: *understand*, then *tools*, then *reply*.
+  - *understand* is one structured LLM call. It returns the buyer details (the same checked keys as now) and what the visitor wants: homes, a question about one home, an EMI, a brochure question, a site visit, a call from the team, or small talk. It replaces the separate extraction call, so a chat message still makes two LLM calls while the visitor waits. Without a key, the patterns and keywords decide.
+  - *tools:* `search_properties` (today's listing search), `calc_emi` (the EMI calculator's formula and defaults: 20% down, 8.5%, 20 years, or whatever the visitor says), `brochure_search`, `book_visit` and `save_lead_details`.
+  - *reply:* the LLM writes from the tool results only, as now; otherwise a template.
+  - The graph chooses tools through structured output instead of each provider's own tool calling, so it behaves the same on Claude, Gemini, Groq and in template mode. LangGraph only orchestrates; every LLM call still goes through `llm_client.py`. The graph's diagram goes in the README, for the pitch.
+- **Brochures:** one fictional brochure per project in `backend/data/brochures/` (18 Markdown files: payment plan, specifications, parking, maintenance, approvals, and the schools, hospitals and metro nearby, with no real names). `backend/app/ai/brochures.py` splits them into passages and ranks them with BM25 keyword search, built at startup. With a key, *understand* also writes English search words, so Hindi and Hinglish questions find the right passage.
+- **Site visits:** a new `site_visits` table (home, day, morning / afternoon / evening, status `requested` / `confirmed` / `done` / `cancelled`, and where the booking came from) with `POST /visits`, `GET /visits` and `PATCH /visits/{id}`. A booking needs contact details: a visitor who has sent an enquiry is booked at once; anyone else gets a small form in the chat (name, mobile, consent) instead of being asked for a number in the chat, so phone numbers never pass through the LLM. A requested visit is the strongest buying signal: 15 intent points (intent stays capped at 100). The dashboard hears `visit_booked`.
+- **Languages:** template replies in Hinglish and Hindi, not only English, plus one regional language (decision 2): language detection, city names and number words for the patterns, and template replies. With a key, the LLM already replies in any language.
+
+### Part 3: Smart engagement trigger (B, A, C)
+How LeadOps catches genuine buyers who would otherwise leave without a trace.
+- **`backend/app/scoring/nudge.py`** decides after each event batch. An offer goes out when the visitor looks human (`human_prob` 0.8 or more) with intent 40+, has left no contact details, isn't chatting, has spent at least a minute on this visit and is on a property page; at most once per visit and twice a day. Each offer is saved (a new `nudges` table) with what happened to it, so we can report how many offers became leads.
+- **Which offer:** the floor plan on WhatsApp (if they haven't downloaded it), a personal EMI plan (if they used the calculator), a site visit (if they have come back), or otherwise a shortlist of three homes. It's in the visitor's language, from templates, so it's instant and free.
+- **Delivery:** the `/events` response gets an optional `nudge`. SDK 1.2 reads it and calls the site's `LeadOps.onNudge(fn)` handler; a site without one shows nothing. The demo site opens the assistant with the offer and the small contact form. Accepting sends an enquiry with `source: "assistant_offer"`, so the buyer becomes a lead and the dashboard's Hot alert says "found by the assistant".
+- The SDK records `nudge_shown`, `nudge_accepted` and `nudge_dismissed`, so the visitor's timeline shows the offer; a new stat tile counts buyers found by the assistant.
+- **Send an offer now:** a button on an anonymous Warm or Hot visitor, so a salesperson can trigger the offer by hand. It reaches the browser with the visitor's next event batch, within about 10 seconds while they are active.
+
+### Part 4: Lead brief, follow-ups and sales verdicts (C, A)
+- **`backend/app/ai/brief.py`**, `GET /visitors/{id}/brief`: three plain lines about the visitor and a recommended next step with how urgent it is ("Call now: asked for a site visit this Saturday"). The next step comes from rules: Hot with a number, call within the hour; Hot without one, send an offer; Warm, a WhatsApp follow-up today; Review, check the flagged details first; Bot and Junk, nothing. The LLM writes the three lines (templates otherwise), only when a salesperson opens a visitor, and the result is kept until the score changes, so it costs little.
+- **Follow-up drafts**, `POST /visitors/{id}/followup` with `whatsapp` or `email` and a language (the visitor's by default): a short message built from the homes they looked at, the EMI they checked and a site-visit offer. The LLM writes `{name}` and the backend fills in the first name, so names still never reach the LLM. The dashboard shows an editable draft with **Copy**, **Open in WhatsApp** (a `wa.me` click-to-chat link with the text filled in; no WhatsApp account or API needed) and **Open in email**.
+- **Book a site visit** in one click from the visitor panel (day and slot), using Part 2's table.
+- **Sales verdicts:** Genuine, Fake and Converted buttons (with an optional note) on the visitor panel and on each enquiry, saved through the existing `POST /feedback`. A verdict counts at once: Fake makes the visitor `Junk` ("Marked fake by the sales team"), Genuine stops the rules and the model from calling them `Bot`, `Junk` or `Review`, and Converted shows as a chip. `VisitorOut` gets the latest `feedback`.
+- The visitor panel opens with the brief, the next step and these actions, above "Why this label".
+
+### Part 5: Consistency check and learning from the sales team (C, B)
+- **`backend/app/scoring/consistency.py`** compares what visitors say with what they do: a stated budget against the prices of the homes they open (says "under ₹50 L" but opens only homes over ₹1.2 Cr), the stated city and BHK against the homes they open, and "to live in" in one message against "investment" in another. The checks show under "Why this label" and in the brief ("Ask about the budget: ..."). They don't change the label, because real buyers do explore; they're questions for the sales call. With a key, the brief's LLM call also spots contradictions in what the visitor wrote, at no extra call.
+- **Learning from verdicts:** `ml/train.py` reads the sales verdicts from the database: Genuine and Converted count as people, Fake as not genuine. They join the real test set (reported on their own as "sales-verified") and the training data, with extra weight, and `model_info.json` says how many verdicts the model learned from. With 20 or more verdicts it also prints suggested intent points, from how Converted and Fake leads differ, for the team to review; nothing is changed silently.
+- Demo: mark a few leads, retrain, press rescore, and the dashboard shows the new model version "learned from 12 sales verdicts".
+
+### Part 6: Privacy (DPDP Act 2023) and OTP (A, B)
+- **Consent:** SDK 1.3 supports `data-consent="required"` on its script tag: it keeps events in the browser until the site calls `LeadOps.consent(true)`; `LeadOps.consent(false)` drops them and stops tracking, and the choice is remembered. Sites that don't add the attribute work as today. The demo site shows a consent banner (Accept / Decline) and a short privacy notice page: what is collected, why, for how long and how to delete it. The enquiry form keeps its consent box. Decision 1 covers what this means for bot detection.
+- **Retention:** `RETENTION_DAYS` (default 180, because buying a home can take months) in `backend/.env.example`. A clean-up at startup and then daily deletes events, sessions and chat older than that and anonymises old enquiries.
+- **Erasure:** `DELETE /visitors/{id}` removes a visitor and everything about them; a "Delete this visitor's data" button on the visitor panel, with a confirmation step.
+- **OTP (mocked):** after an enquiry, the form asks for a 6-digit code. No SMS is sent in the demo; the code appears on screen, labelled as a demo. `POST /leads/{id}/verify` marks the phone as verified: a "Phone verified by OTP" check and 5 intent points. A real SMS provider (MSG91, Twilio) can plug in later.
+- **Dashboard passcode:** when `DASHBOARD_PASSCODE` is set, the dashboard's routes and WebSocket need it, and the dashboard asks for it once per browser session. Locally, with it unset, nothing changes. It must be on before the Week 4 deploy, because the dashboard shows names and phone numbers.
+- The Playwright bots and the tester guide get one more step: accept the banner.
+
+### Contract additions (need the team's OK)
+As in Week 2, nothing is renamed or removed, every new field is optional, and `docs/CONTRACTS.md` is updated in the same commit as each part. The one behaviour change, the passcode, applies only when it is set.
+
+| Where | Addition |
+|---|---|
+| `POST /events` response | optional `nudge`: `{id, kind, text, listing_id, cta}` |
+| SDK | `LeadOps.onNudge(fn)`, `LeadOps.consent(true / false)`, `data-consent="required"`; events `nudge_shown`, `nudge_accepted`, `nudge_dismissed` |
+| `LeadIn` / `LeadOut` | optional `source`: `form` / `assistant_offer` / `chat`; `LeadOut.phone_verified` |
+| `ChatOut` | optional `action` (`contact_form` or `visit_booked`) and `emi` |
+| Site visits | `POST /visits`, `GET /visits`, `PATCH /visits/{id}`; WebSocket `visit_booked` |
+| Brief, follow-up, offers | `GET /visitors/{id}/brief`, `POST /visitors/{id}/followup`, `POST /visitors/{id}/nudge` |
+| Demo tools | `POST /demo/simulate`, `DELETE /demo/simulated`, `POST /demo/bot`; WebSocket `simulation_progress`, `simulation_done` |
+| `VisitorOut` | `feedback`: the latest sales verdict |
+| `score_detail` and intent | `consistency`: `[{check, ok, text}]`; new intent signals `site_visit` (15) and `phone_verified` (5) |
+| Privacy | `DELETE /visitors/{id}`, `POST /leads/{id}/verify`; dashboard routes need the passcode when `DASHBOARD_PASSCODE` is set |
+
+### New files
+| File | What it's for |
+|---|---|
+| `backend/app/api/demo.py` | Simulate traffic, clear simulated visitors, run a local bot |
+| `backend/app/ai/agent.py` | the LangGraph assistant |
+| `backend/app/ai/brochures.py`, `backend/data/brochures/` (18 files) | the fictional brochures and their BM25 search |
+| `backend/app/api/visits.py` | site-visit routes (the table goes in `models.py`) |
+| `backend/app/scoring/nudge.py` | the smart engagement trigger |
+| `backend/app/ai/brief.py` | the three-line brief, next step and follow-up drafts |
+| `backend/app/scoring/consistency.py` | the say-versus-do checks |
+| `backend/app/retention.py` | the daily clean-up and erasure |
+| `backend/app/auth.py` | the dashboard passcode |
+| `frontend/src/components/ContactCapture.jsx` | the small name / mobile / consent form for offers and site visits |
+| `frontend/src/components/ConsentBanner.jsx`, `frontend/src/pages/Privacy.jsx` | the consent banner and privacy notice |
+| `frontend/src/dashboard/SimulateTraffic.jsx` | the Simulate traffic dialog, progress bar and scoreboard |
+| `frontend/src/dashboard/LeadBrief.jsx` | brief, next step, follow-up drafts, site visit and verdict buttons |
+| `backend/tests/test_demo.py`, `test_agent.py`, `test_engagement.py`, `test_privacy.py` | tests for Part 1, Part 2, Parts 3-5 and Part 6 |
+
+### New packages
+- Backend (`backend/requirements.txt`): `langgraph` 1.2 (it brings `langchain-core`; 20 packages, all with ready-made wheels for Python 3.14 on Windows, checked on 8 Nov with a pip dry run). Nothing else.
+- Frontend: none. Dialogs use the browser's own `<dialog>`; Recharts arrives with the analytics page in Week 4.
+
+### Changes from the main plan
+- **Brochure search uses BM25 over Markdown brochures, not ChromaDB over PDFs.** ChromaDB would add 57 packages (onnxruntime, gRPC, a Kubernetes client, OpenTelemetry) and download an embedding model of about 80 MB, trained mostly on English, the first time it runs: slow to deploy and tight on Render's free tier. For 18 brochures, keyword ranking finds "payment plan" or "parking" just as well, and the LLM turns Hindi questions into English search words. A builder's real PDFs can be added later by extracting their text (`pypdf`).
+- **The agent picks its tools with structured output** rather than each provider's tool calling (Part 2), so Claude, Gemini, Groq and template mode behave the same.
+- **WhatsApp follow-ups open WhatsApp's click-to-chat link** with the draft filled in; sending automatically through the Twilio sandbox stays a stretch goal.
+- **The LLM brief is written on demand**, when a salesperson opens a visitor, not on every event.
+- **The analytics page stays in Week 4**, as planned.
+
+### Decisions for you
+1. **Consent before tracking (DPDP):**
+   - **Ask first (recommended):** nothing is sent until the visitor accepts the banner, which fits the DPDP Act's consent rule. A bot that never accepts leaves no behaviour to judge, but its enquiry still faces the form checks (the hidden field, its speed, the details) and goes to `Review` as an enquiry with no browsing. Our Playwright bots will accept the banner, as a real stealth bot would.
+   - **Notice only:** tracking starts at once and the banner offers "don't track me". Bot detection stays as strong as today, but the consent story is weaker in front of judges.
+2. **The regional language:** pick one that a teammate reads, so someone can check the replies: Marathi (Pune and Mumbai), Kannada (Bengaluru), Telugu (Hyderabad), or another. Marathi is the default if nobody has a preference.
+3. **Contracts:** are the additions above OK, or should the team see them first?
+4. **One real LLM check:** the LLM features have never run against a real API. If there is a key in `backend/.env`, may I use it once at the end of Part 2 for about 20 chat messages (under $1 on Claude Opus 5.5)? Otherwise every check stays in template mode, as now.
+
+### Team actions this week (not code)
+- **Real test sessions:** the real test set still has no human sessions, and the target is 30-50 by 21 Nov. One 30-minute session with 10 classmates on the same Wi-Fi (README, "Collecting real test sessions"), each browsing once on a phone and once on a laptop, gives 20; two or three play junk on purpose.
+- **An LLM key for the rehearsals.** Template mode keeps the demo safe, but the agent, the brief and the follow-ups only show their quality with a key. A chat message makes up to three calls: about $0.03 on Claude Opus 5.5 (the default) or under a tenth of a cent on Claude Haiku 5.5 (`LLM_MODEL=claude-haiku-5-5`).
+
+### Verification (end of Week 3)
+- `python -m pytest` in `backend/`: all old and new tests pass, with no LLM calls.
+- Backend with `LLM_PROVIDER=none` and a throwaway database: **Simulate traffic** sorts 200 / 30 / 20 and shows the scoreboard, and **Clear** removes them; **Run a real bot** (stealth) lands in `Bot`.
+- Browsing as a buyer after accepting the banner: the offer appears once, after the EMI calculator and the floor plan; sharing a number creates a lead "found by the assistant" and a Hot alert. Declining the banner sends nothing.
+- In template mode, in English and Hinglish, the assistant answers a payment-plan question from the brochure, works out an EMI with 30% down and books a Saturday-morning visit that appears on the dashboard.
+- A lead's brief, next step and WhatsApp draft appear (templates without a key); a site visit books in one click; a Fake verdict moves the visitor to `Junk`; `ml/train.py` reports the verdicts.
+- A visitor who says "under 50 lakh" but opens ₹1.5 Cr homes gets the budget check.
+- Deleting a visitor removes them everywhere; the clean-up removes old rows (tested); with `DASHBOARD_PASSCODE` set, the dashboard routes refuse requests without it.
+- `npm run build` passes; the new panels work at phone width.
