@@ -83,3 +83,38 @@ def test_failures_become_llm_errors(response, message):
     wrapper = claude_wrapper(lambda request: response, "claude-opus-5-5")
     with pytest.raises(LLMError, match=message):
         wrapper.generate("s", [{"role": "user", "content": "hi"}])
+
+
+SCHEMA = {"type": "object", "properties": {"city": {"type": "string"}}, "required": ["city"], "additionalProperties": False}
+
+
+def test_json_request_uses_structured_outputs_with_low_effort():
+    seen = {}
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen["body"] = json.loads(request.content)
+        return reply(text='{"city": "Pune"}')
+
+    wrapper = claude_wrapper(handler, "claude-opus-5-5")
+    assert wrapper.generate_json("extract", [{"role": "user", "content": "Pune mein"}], SCHEMA) == {"city": "Pune"}
+    body = seen["body"]
+    assert body["output_config"] == {"effort": "low", "format": {"type": "json_schema", "schema": SCHEMA}}
+    assert body["fallbacks"] == "default" and "temperature" not in body
+
+
+def test_json_answers_that_are_cut_off_or_not_json_are_errors():
+    cut_off = claude_wrapper(lambda request: reply(stop_reason="max_tokens", text='{"city": "Pu'), "claude-opus-5-5")
+    with pytest.raises(LLMError, match="cut off"):
+        cut_off.generate_json("s", [{"role": "user", "content": "hi"}], SCHEMA)
+    prose = claude_wrapper(lambda request: reply(text="Sorry, I can't help with that."), "claude-opus-5-5")
+    with pytest.raises(LLMError, match="JSON"):
+        prose.generate_json("s", [{"role": "user", "content": "hi"}], SCHEMA)
+
+
+def test_json_from_models_without_a_schema_is_unwrapped():
+    from app.ai.llm_client import _json_object
+
+    assert _json_object('```json\n{"type": "broker"}\n```', "groq") == {"type": "broker"}
+    assert _json_object('Here you go: {"a": 1}', "gemini") == {"a": 1}
+    with pytest.raises(LLMError):
+        _json_object("[1, 2]", "groq")

@@ -5,14 +5,18 @@ load_record() builds the same *visitor record* the simulator writes (see feature
 training compute features from the same shape. Scoring never breaks ingestion: any error is logged and skipped.
 """
 
+import hashlib
+import json
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..ai.classify import classify
 from ..db import SessionLocal
 from ..models import ChatMessage, Event, Lead, Score, Visitor, VisitSession
 from ..realtime import hub
@@ -48,7 +52,7 @@ def score_visitor(visitor_id: str) -> ScoreUpdate | None:
         if record is None:
             return None
         visitor = db.get(Visitor, visitor_id)
-        result = score_record(record, visitor_type=visitor.visitor_type)
+        result = score_record(record, visitor_type=known_type(visitor.visitor_type))
         previous_label, previous_intent = visitor.label, visitor.intent_score
         now = utcnow()
         saved = result.as_json()
@@ -88,6 +92,56 @@ async def publish(visitor: VisitorOut | None, update: ScoreUpdate | None) -> Non
             "human_prob": current.score.human_prob, "visitor_type": current.score.visitor_type,
             "reasons": current.score.reasons,
         })  # fmt: skip
+
+
+def known_type(saved: dict | None) -> dict | None:
+    """The saved visitor type without bookkeeping, or None when the messages didn't say."""
+    if not saved or not saved.get("type"):
+        return None
+    return {key: value for key, value in saved.items() if key != "text_hash"}
+
+
+def classify_visitor(visitor_id: str) -> ScoreUpdate | None:
+    """Work out the visitor type from their messages (the LLM, or keywords), save it and rescore.
+
+    Skipped when the messages haven't changed since the last time, so a rescore never pays for another LLM call.
+    """
+    with SessionLocal() as db:
+        visitor = db.get(Visitor, visitor_id)
+        if visitor is None:
+            return None
+        texts = list(db.scalars(select(Lead.message).where(Lead.visitor_id == visitor_id, Lead.message.is_not(None)).order_by(Lead.id)))
+        texts += list(db.scalars(
+            select(ChatMessage.text).where(ChatMessage.visitor_id == visitor_id, ChatMessage.role == "user").order_by(ChatMessage.id)
+        ))  # fmt: skip
+        profile = dict(visitor.profile or {})
+        saved = visitor.visitor_type or {}
+    digest = hashlib.sha1(json.dumps([texts, profile.get("purpose")], ensure_ascii=False).encode()).hexdigest()[:16]
+    if saved.get("text_hash") == digest:
+        return None
+    result = classify(texts, profile)  # may call the LLM: no database session is open
+    with SessionLocal() as db:
+        visitor = db.get(Visitor, visitor_id)
+        visitor.visitor_type = {**(result or {}), "text_hash": digest}
+        db.commit()
+    return score_safely(visitor_id)
+
+
+def classify_safely(visitor_id: str | None) -> ScoreUpdate | None:
+    if not visitor_id:
+        return None
+    try:
+        return classify_visitor(visitor_id)
+    except Exception:
+        log.exception("Classifying visitor %s failed", visitor_id)
+        return None
+
+
+async def classify_in_background(visitor_id: str | None) -> None:
+    """Run after the response is sent (FastAPI BackgroundTasks), so a slow LLM never delays a visitor."""
+    update = await run_in_threadpool(classify_safely, visitor_id)
+    if update:
+        await publish(None, update)
 
 
 def rescore_all() -> int:

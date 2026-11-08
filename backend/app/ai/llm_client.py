@@ -4,9 +4,14 @@ With LLM_PROVIDER=auto (the default) the first key that is set wins: ANTHROPIC_A
 GEMINI_API_KEY, then GROQ_API_KEY. LLM_MODEL overrides the provider's default model.
 With no key, or LLM_PROVIDER=none, available() is False and callers use their template fallback.
 Every failure raises LLMError, so callers fall back the same way and the demo never breaks.
+
+generate() returns reply text; generate_json() returns a JSON object for extraction and classification. Callers
+still check every value, because only Claude's structured outputs guarantee the schema.
 """
 
+import json
 import logging
+import re
 
 import anthropic
 import httpx
@@ -76,16 +81,39 @@ class LLMClient:
             raise LLMError(f"{self.provider} returned an empty answer")
         return text
 
+    def generate_json(self, system: str, messages: list[dict[str, str]], schema: dict, *, max_tokens: int = 1024) -> dict:
+        """A JSON object that follows `schema` (a JSON Schema whose objects all set additionalProperties: false).
+
+        Claude gets it as a structured output, so its answer always parses. Gemini and Groq get their JSON mode
+        with the schema in the system prompt. Any failure, including JSON that doesn't parse, raises LLMError.
+        """
+        if self.provider == "anthropic":
+            text = self._claude(system, messages, json_schema=schema)
+        elif self.provider in ("gemini", "groq"):
+            described = f"{system}\n\nReply with only a JSON object that follows this JSON schema:\n{json.dumps(schema)}"
+            if self.provider == "gemini":
+                text = self._gemini(described, messages, json_mode=True)
+            else:
+                text = self._groq(described, messages, max_tokens, json_mode=True)
+        else:
+            raise LLMError("No LLM provider is configured")
+        return _json_object(text, self.provider)
+
     # ---------------------------------------------------------------- Claude (Anthropic SDK)
 
-    def _claude(self, system: str, messages: list[dict[str, str]]) -> str:
+    def _claude(self, system: str, messages: list[dict[str, str]], *, json_schema: dict | None = None) -> str:
         if self._claude_client is None:
             self._claude_client = anthropic.Anthropic(
                 api_key=settings.anthropic_api_key, timeout=TIMEOUT_SECONDS, max_retries=1
             )
         params: dict = {"model": self.model, "max_tokens": 16000, "system": system, "messages": messages}
+        output_config: dict = {}
         if self.model.startswith(_EFFORT_MODEL_PREFIXES):
-            params["output_config"] = {"effort": "low"}  # short chat replies: quick and cheap
+            output_config["effort"] = "low"  # short replies and small JSON objects: quick and cheap
+        if json_schema is not None:  # structured outputs: the answer is guaranteed to follow the schema
+            output_config["format"] = {"type": "json_schema", "schema": json_schema}
+        if output_config:
+            params["output_config"] = output_config
         try:
             if self.model in _FALLBACK_MODELS:
                 # If Claude's safety checks decline a message, Anthropic re-runs it on its recommended
@@ -107,11 +135,13 @@ class LLMClient:
             raise LLMError("Could not reach the Claude API (network problem or timeout)") from exc
         if response.stop_reason == "refusal":
             raise LLMError("Claude declined to answer this message")
+        if json_schema is not None and response.stop_reason == "max_tokens":
+            raise LLMError("Claude's JSON answer was cut off")
         return "".join(block.text for block in response.content if block.type == "text")
 
     # ---------------------------------------------------------------- Gemini and Groq (REST)
 
-    def _gemini(self, system: str, messages: list[dict[str, str]]) -> str:
+    def _gemini(self, system: str, messages: list[dict[str, str]], *, json_mode: bool = False) -> str:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent"
         body = {
             "systemInstruction": {"parts": [{"text": system}]},
@@ -122,6 +152,8 @@ class LLMClient:
             # Room for the model's thinking as well as the reply; keep replies short through the prompt.
             "generationConfig": {"temperature": 0.4, "maxOutputTokens": 4096},
         }
+        if json_mode:
+            body["generationConfig"]["responseMimeType"] = "application/json"
         data = self._post("Gemini", url, body, {"x-goog-api-key": settings.gemini_api_key})
         try:
             parts = data["candidates"][0]["content"]["parts"]
@@ -130,13 +162,15 @@ class LLMClient:
             raise LLMError(f"Gemini returned no answer (finish reason: {reason})") from exc
         return "".join(part.get("text", "") for part in parts if not part.get("thought"))
 
-    def _groq(self, system: str, messages: list[dict[str, str]], max_tokens: int) -> str:
+    def _groq(self, system: str, messages: list[dict[str, str]], max_tokens: int, *, json_mode: bool = False) -> str:
         body = {
             "model": self.model,
             "messages": [{"role": "system", "content": system}, *messages],
             "temperature": 0.4,
             "max_tokens": max_tokens,
         }
+        if json_mode:
+            body["response_format"] = {"type": "json_object"}
         headers = {"Authorization": f"Bearer {settings.groq_api_key}"}
         data = self._post("Groq", "https://api.groq.com/openai/v1/chat/completions", body, headers)
         try:
@@ -156,6 +190,21 @@ class LLMClient:
             return response.json()
         except ValueError as exc:
             raise LLMError(f"{name} sent a response that isn't JSON") from exc
+
+
+def _json_object(text: str, provider: str | None) -> dict:
+    """The JSON object in an answer; tolerates a ```json fence or words around it from models without a schema."""
+    cleaned = re.sub(r"^```(?:json)?|```$", "", (text or "").strip()).strip()
+    start, end = cleaned.find("{"), cleaned.rfind("}")
+    if start == -1 or end < start:
+        raise LLMError(f"{provider} didn't return a JSON object")
+    try:
+        value = json.loads(cleaned[start : end + 1])
+    except json.JSONDecodeError as exc:
+        raise LLMError(f"{provider} returned JSON that doesn't parse") from exc
+    if not isinstance(value, dict):
+        raise LLMError(f"{provider} returned JSON that isn't an object")
+    return value
 
 
 llm = LLMClient()

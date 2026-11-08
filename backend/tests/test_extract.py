@@ -44,3 +44,69 @@ def test_loan_tenure_is_not_a_move_in_timeline():
 
 def test_nothing_found_in_small_talk():
     assert extract_details("hello, how are you?") == {"language": "en"}
+
+
+# ---------------------------------------------------------------- purpose and LLM extraction
+
+from app.ai import extract as extract_module  # noqa: E402
+from app.ai.extract import clean_details, smart_extract  # noqa: E402
+from app.ai.llm_client import LLMError  # noqa: E402
+
+
+@pytest.mark.parametrize(
+    ("message", "purpose"),
+    [
+        ("Buying as an investment, what rental yield?", "investment"),
+        ("I want to buy and rent it out", "investment"),
+        ("A home to live in with my family", "own_use"),
+        ("Khud ke liye ghar chahiye", "own_use"),
+        ("3BHK in Pune", None),
+    ],
+)
+def test_purpose(message, purpose):
+    assert extract_details(message).get("purpose") == purpose
+
+
+def test_llm_values_are_checked():
+    raw = {"city": "Delhi", "locality": "Wagholi", "bhk": 9, "budget_min": 9_500_000, "budget_max": 8_000_000,
+           "timeline_months": 3.0, "loan_needed": "yes", "purpose": "renting", "language": "hinglish"}
+    assert clean_details(raw) == {"locality": "Wagholi", "city": "Pune", "budget_min": 8_000_000,
+                                  "budget_max": 9_500_000, "timeline_months": 3, "language": "hinglish"}
+    assert clean_details({"bhk": True, "budget_max": float("nan"), "city": "bangalore"}) == {"city": "Bengaluru"}
+
+
+class FakeLLM:
+    def __init__(self, answer=None, error=None):
+        self.answer, self.error, self.calls = answer, error, []
+
+    def available(self):
+        return True
+
+    def generate_json(self, system, messages, schema, **kwargs):
+        self.calls.append(messages[0]["content"])
+        if self.error:
+            raise self.error
+        return self.answer
+
+
+def test_smart_extract_merges_the_llm_with_the_patterns(monkeypatch):
+    fake = FakeLLM({"city": "Bengaluru", "locality": None, "bhk": None, "budget_min": None, "budget_max": None,
+                    "timeline_months": None, "loan_needed": None, "purpose": None, "language": "en"})
+    monkeypatch.setattr(extract_module, "llm", fake)
+    found = smart_extract("same budget but in Bangalore, call 9822012345", ["3BHK under 90L in Pune"])
+    assert found["city"] == "Bengaluru"
+    assert "[phone]" in fake.calls[0] and "9822012345" not in fake.calls[0]  # masked before it reaches the LLM
+    assert "<earlier_messages>" in fake.calls[0]
+
+
+def test_smart_extract_keeps_one_budget_pair(monkeypatch):
+    fake = FakeLLM({"city": None, "locality": None, "bhk": None, "budget_min": 8_000_000, "budget_max": 8_500_000,
+                    "timeline_months": None, "loan_needed": None, "purpose": None, "language": "hinglish"})
+    monkeypatch.setattr(extract_module, "llm", fake)
+    found = smart_extract("80-85 lakh ke beech, under 1 cr nahi")
+    assert (found["budget_min"], found["budget_max"]) == (8_000_000, 8_500_000)
+
+
+def test_smart_extract_falls_back_to_the_patterns(monkeypatch):
+    monkeypatch.setattr(extract_module, "llm", FakeLLM(error=LLMError("timeout")))
+    assert smart_extract("3BHK under 90L in Pune")["budget_max"] == 9_000_000

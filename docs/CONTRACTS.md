@@ -115,7 +115,8 @@ Request: `{"visitor_id": "...", "session_id": "...", "message": "3BHK under 90L 
 
 - **extracted**: details found in this message; **profile**: everything known so far (saved on the visitor).
 - Buyer detail keys: `city`, `locality`, `bhk`, `budget_min`, `budget_max` (INR), `timeline_months`,
-  `loan_needed` (true/false), `language` (`en` / `hinglish` / `hi`). Week 2's LLM extraction keeps these keys.
+  `loan_needed` (true/false), `purpose` (`own_use` / `investment`), `language` (`en` / `hinglish` / `hi`). With an
+  LLM key, the LLM extraction fills the same keys; every value is checked before it is saved.
 - **mode**: `llm` when an LLM wrote the reply, `template` without a key or when the LLM call failed.
 
 ## 4. Routes
@@ -182,7 +183,8 @@ Build Plan, and `backend/app/scoring/combine.py`).
 - **human_prob**: 0-1 from the ML human check (LightGBM), `model_version` says which model (`fallback` when no
   model file is loaded). **intent_score**: 0-100 points for buying signals. **reasons**: up to five, most
   important first. **visitor_type**: `end_buyer` / `investor` / `tenant` / `broker` / `spam` once the visitor's
-  messages have been classified (Part 6), otherwise `null`.
+  enquiry messages and chat have been classified (in the background, by the LLM or keyword rules), otherwise
+  `null`. A confident (0.7+) broker, spam or tenant is `Junk`, or `Review` with intent 70+.
 
 `VisitorDetailOut.score_detail` (only in `GET /visitors/{id}`):
 
@@ -193,7 +195,7 @@ Build Plan, and `backend/app/scoring/combine.py`).
             "factors": [{"feature": "mouse_px_per_move", "label": "size of each mouse jump", "value": 138.8,
                          "contribution": 2.1, "towards": "bot"}]},
   "intent": {"score": 82, "points": [{"signal": "emi", "points": 12, "detail": "Checked the EMI on a ₹85 L home"}]},
-  "visitor_type": null,
+  "visitor_type": {"type": "investor", "confidence": 0.7, "reason": "Buying as an investment", "source": "keywords"},
   "thresholds": {"bot": 0.2, "review": 0.5}
 }
 ```

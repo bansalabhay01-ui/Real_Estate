@@ -1,15 +1,23 @@
-"""Pick buyer details out of a chat message with simple patterns: English, Hinglish and basic Hindi.
+"""Pick buyer details out of a chat message: patterns first (English, Hinglish and basic Hindi), then the LLM.
 
     "3BHK under 90L in Pune?"            -> {"city": "Pune", "bhk": 3, "budget_max": 9000000, ...}
     "Pune mein 90 lakh tak 3BHK chahiye" -> the same
 
-Member C upgrades this to LLM JSON extraction in Week 2. Keep these output keys (all optional):
-city, locality, bhk, budget_min, budget_max (INR), timeline_months, loan_needed, language ("en", "hinglish", "hi").
+smart_extract() runs the patterns and, when an LLM key is set, lets the LLM read the message with the last few
+turns ("same budget but in Bengaluru", "80-85 lakh ke beech", "teen BHK"). Every LLM value is checked before it is
+used, and any LLM failure falls back to the patterns. Output keys (all optional): city, locality, bhk, budget_min,
+budget_max (INR), timeline_months, loan_needed, purpose ("own_use" / "investment"), language ("en", "hinglish", "hi").
 """
 
+import logging
+import math
 import re
 
 from ..listings import locality_index
+from .llm_client import LLMError, llm
+from .privacy import mask_pii
+
+log = logging.getLogger("leadops.extract")
 
 LAKH = 100_000
 CRORE = 10_000_000
@@ -71,6 +79,15 @@ _NO_LOAN = re.compile(
 )
 _LOAN = re.compile(r"\b(?:home loan|housing loan|loan|emi|finance|financing|mortgage)\b|लोन")
 
+_INVESTMENT = re.compile(
+    r"\b(?:invest(?:ment|ing)?|rental (?:income|yield)|roi|appreciation|resale value|rent (?:it )?out)\b"
+    r"|investment ke liye|nivesh|निवेश"
+)
+_OWN_USE = re.compile(
+    r"\b(?:own use|self use|end use|to live in|for (?:my|our) family|live there|stay there|khud ke liye|apne liye"
+    r"|rehne ke liye)\b|रहने के लिए|अपने लिए|खुद के लिए"
+)
+
 _DEVANAGARI = re.compile(r"[ऀ-ॿ]")
 _HINGLISH_WORDS = {
     "mein", "mujhe", "chahiye", "tak", "hai", "kya", "ka", "ki", "ke", "se", "aur", "nahi", "ghar", "lena",
@@ -97,8 +114,126 @@ def extract_details(message: str) -> dict:
         details["timeline_months"] = months
     if (loan := _find_loan(text)) is not None:
         details["loan_needed"] = loan
+    if _INVESTMENT.search(text):
+        details["purpose"] = "investment"
+    elif _OWN_USE.search(text):
+        details["purpose"] = "own_use"
     details["language"] = detect_language(message)
     return details
+
+
+# ---------------------------------------------------------------- LLM extraction
+
+CITIES = list(_CITY_ALIASES)
+PURPOSES = ("own_use", "investment")
+LANGUAGES = ("en", "hinglish", "hi")
+
+EXTRACTION_SYSTEM = """\
+You read one message from a visitor on an Indian real estate website and pick out the home-buying details it states.
+
+Use null for anything the latest message doesn't say. Earlier messages are only context, for replies such as \
+"same budget, but in Bengaluru".
+- city: Pune, Bengaluru, Hyderabad, Mumbai or Noida (Bangalore is Bengaluru, Bombay is Mumbai).
+- locality: a neighbourhood the visitor names, as written.
+- bhk: the number of bedrooms.
+- budget_min / budget_max: rupees as whole numbers (90 lakh = 9000000, 1.2 crore = 12000000). "Under 90L" is \
+budget_max only; "80 to 90 lakh" sets both.
+- timeline_months: when they want to move in, in months ("immediately" = 1, "next year" = 12).
+- loan_needed: true if they need a home loan, false if they say they don't.
+- purpose: "own_use" to live in, "investment" to invest or rent out.
+- language: "en" (English), "hinglish" (Hindi in Roman script) or "hi" (Hindi in Devanagari).
+"[phone]" and "[email]" are details hidden for privacy."""
+
+
+def _nullable(schema: dict) -> dict:
+    return {"anyOf": [schema, {"type": "null"}]}
+
+
+EXTRACTION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "city": _nullable({"type": "string", "enum": CITIES}),
+        "locality": _nullable({"type": "string"}),
+        "bhk": _nullable({"type": "integer"}),
+        "budget_min": _nullable({"type": "integer"}),
+        "budget_max": _nullable({"type": "integer"}),
+        "timeline_months": _nullable({"type": "integer"}),
+        "loan_needed": _nullable({"type": "boolean"}),
+        "purpose": _nullable({"type": "string", "enum": list(PURPOSES)}),
+        "language": {"type": "string", "enum": list(LANGUAGES)},
+    },
+    "required": ["city", "locality", "bhk", "budget_min", "budget_max", "timeline_months", "loan_needed", "purpose", "language"],
+    "additionalProperties": False,
+}
+
+
+def _whole(value) -> int | None:
+    """An integer that isn't a bool (JSON true would otherwise pass as 1), NaN or a fraction."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        return None
+    return int(value) if value == int(value) else None
+
+
+def clean_details(raw: dict) -> dict:
+    """Only the values that make sense: a known city or listing locality, BHK 1-6, budgets between 5 L and 100 Cr,
+    a move-in within 5 years, and the allowed words for purpose and language."""
+    found: dict = {}
+    if isinstance(raw.get("city"), str):
+        name = raw["city"].strip().casefold()
+        city = CITY_LOOKUP.get(name) or next((item for item in CITIES if item.casefold() == name), None)
+        if city:
+            found["city"] = city
+    if isinstance(raw.get("locality"), str) and raw["locality"].strip():
+        if locality := _find_locality(_normalise(raw["locality"])):
+            found["locality"] = locality
+            found["city"] = locality_index()[locality.casefold()].city  # the locality decides the city
+    if (bhk := _whole(raw.get("bhk"))) is not None and 1 <= bhk <= 6:
+        found["bhk"] = bhk
+    budgets = {key: _whole(raw.get(key)) for key in ("budget_min", "budget_max")}
+    budgets = {key: value for key, value in budgets.items() if value is not None and MIN_BUDGET <= value <= MAX_BUDGET}
+    if len(budgets) == 2 and budgets["budget_min"] > budgets["budget_max"]:
+        budgets = {"budget_min": budgets["budget_max"], "budget_max": budgets["budget_min"]}
+    found.update(budgets)
+    if (months := _whole(raw.get("timeline_months"))) is not None and 0 <= months <= 60:
+        found["timeline_months"] = months
+    if isinstance(raw.get("loan_needed"), bool):
+        found["loan_needed"] = raw["loan_needed"]
+    if raw.get("purpose") in PURPOSES:
+        found["purpose"] = raw["purpose"]
+    if raw.get("language") in LANGUAGES:
+        found["language"] = raw["language"]
+    return found
+
+
+def extract_with_llm(message: str, history: list[str]) -> dict:
+    """The details the LLM finds in this message, checked. Phones and emails are masked first; raises LLMError."""
+    earlier = "\n".join(f"- {mask_pii(text)}" for text in history[-4:])
+    content = (f"<earlier_messages>\n{earlier}\n</earlier_messages>\n\n" if earlier else "") + (
+        f"<latest_message>\n{mask_pii(message)}\n</latest_message>"
+    )
+    raw = llm.generate_json(EXTRACTION_SYSTEM, [{"role": "user", "content": content}], EXTRACTION_SCHEMA, max_tokens=512)
+    return clean_details(raw)
+
+
+def smart_extract(message: str, history: list[str] | None = None) -> dict:
+    """The patterns' details, improved by the LLM when a key is set. history: the visitor's earlier messages."""
+    found = extract_details(message)
+    if not llm.available():
+        return found
+    try:
+        from_llm = extract_with_llm(message, history or [])
+    except LLMError as exc:
+        log.warning("LLM extraction failed, using the patterns only: %s", exc)
+        return found
+    merged = {**found, **from_llm}  # the LLM wins where it found something; a null never erases a pattern's find
+    if "budget_min" in from_llm or "budget_max" in from_llm:  # never mix one extractor's minimum with the other's maximum
+        for key in ("budget_min", "budget_max"):
+            merged.pop(key, None)
+            if key in from_llm:
+                merged[key] = from_llm[key]
+    if _DEVANAGARI.search(message):
+        merged["language"] = "hi"
+    return merged
 
 
 def merge_profile(profile: dict, found: dict) -> dict:

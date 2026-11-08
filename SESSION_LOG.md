@@ -3,17 +3,17 @@
 A short diary of LeadOps work sessions, newest first. Claude saves each session by itself: whenever a piece of work is finished, and at the start of the next session if the last one wasn't saved. Each save updates this file, commits, and pushes to GitHub.
 
 ## Current status
-_Last updated: 2026-11-07_
+_Last updated: 2026-11-08_
 
-- **Phase:** Week 2 (Intelligence, 6–13 Nov) in progress: Parts 1-5 of 6 done. Deadline about 30 Nov 2026.
-- **Done:** the Week 1 foundation (demo property site, tracking SDK, FastAPI backend, a basic property assistant in English, Hinglish and Hindi, the live sales dashboard, the traffic simulator, the shared contracts draft) and the Week 2 build plan ("Week 2 Build Plan" at the end of `LEADOPS_PLAN.md`). Week 2 Part 1: tester links that label real test sessions, and same-Wi-Fi testing. Part 2: simulator v2, the shared visitor features and the bot/junk rules. Part 3: the LightGBM human check with SHAP, intent points, labels and reasons, scored live on every event. Part 4: the dashboard shows labels, intent, filters with counts and a "Why this label" panel, with Hot alerts. Part 5: three real Playwright bots, all caught (the stealth one by the ML model alone). 87 tests pass. Roughly 53% of the whole plan.
-- **Next:** Week 2 Part 6: LLM detail extraction and visitor-type classification. Classmates can start test sessions now (README, "Collecting real test sessions"); the real test set has no human sessions yet.
-- **Blocked:** pushing to GitHub needs the user to sign in again (Git Credential Manager asked on 2026-11-07); the Part 4 and Part 5 commits are saved locally until then. The assistant's LLM replies haven't been tried with a real API key yet (template replies work).
+- **Phase:** Week 2 (Intelligence) is finished, all six parts, five days early (planned 6–13 Nov). Week 3 (Integration + Wow) is next. Deadline about 30 Nov 2026.
+- **Done:** the Week 1 foundation (demo property site, tracking SDK, FastAPI backend, a basic property assistant in English, Hinglish and Hindi, the live sales dashboard, the traffic simulator, the shared contracts draft) and all of Week 2 ("Week 2 Build Plan" in `LEADOPS_PLAN.md`): tester links for real test sessions; simulator v2, visitor features and bot/junk rules; the LightGBM human check with SHAP, intent points, labels and reasons, scored live; dashboard v1 with labels, filters, "Why this label" and Hot alerts; three real Playwright bots, all caught; LLM detail extraction and visitor-type classification (end buyer, investor, tenant, broker, spam). 110 tests pass. Roughly 56% of the whole plan.
+- **Next:** the Week 3 build plan, for the user's go-ahead. Classmates can start test sessions now (README, "Collecting real test sessions"); the real test set has no human sessions yet.
+- **Blocked:** the LLM features (replies, extraction, visitor type) haven't been tried with a real API key yet; template mode and the keyword rules work, and Claude's request shape matches the API reference.
 - **Code:** https://github.com/bansalabhay01-ui/Real_Estate (branch `main`)
 
 ---
 
-## 2026-11-06 · bansalabhay01-ui · Week 2 plan, Parts 1-5 (tester link, features and rules, model and labels, dashboard, bots)
+## 2026-11-06 · bansalabhay01-ui · Week 2 plan and Parts 1-6 (tester link, features and rules, model and labels, dashboard, bots, LLM extraction and visitor type)
 
 **Done**
 - Wrote the Week 2 build plan as a new section at the end of `LEADOPS_PLAN.md`. It has six parts: tester link for real sessions, simulator v2 + features + rules, LightGBM model + intent score + labels + reasons, dashboard v1 with scores, Playwright bots, and LLM extraction + visitor type. It also lists the contract additions, new files, new packages, changes from the main plan and the checks.
@@ -44,11 +44,19 @@ _Last updated: 2026-11-07_
   - The model now has monotone constraints (`ml/train.py`), so a bot signal can only push towards "bot" and SHAP bars read sensibly; importance is spread across behaviour features. Retrained as `lgbm-20261107-49dc13`; simulated results unchanged.
   - Checked: 87 tests pass, the frontend builds, and a headless Edge check passed 10/10 (badges, Hot filter rows = Hot count, intent sort, Hot alert, score panel, enquiry labels, no sideways scroll at phone width, no page errors). Screenshots looked right at desktop and phone width.
 - **Part 5, Playwright bots:** `ml/bots/run_bots.py` with three bots (naive form bot, stealth form bot, scraper) that drive the installed Edge or Chrome; `--headed` for the live demo, `--api` prints each bot's label. Every run uses a `lo_test=bot` tester link, so the bots join the real test set. Checked: 9 runs (3 of each), all labelled Bot. The naive bot and the scraper were caught by the rules (honeypot, webdriver, headless user agent); the stealth bot by the ML model alone ("under 1% likely to be a person; the mouse jumped about 63-99 pixels at a time"). `ml/train.py`'s real-test-set report works: 9/9 tester bots caught. README: "Playwright bots".
+- **Part 6, LLM extraction and visitor type** (built on 2026-11-07, checked and saved on 2026-11-08):
+  - `llm_client.generate_json()`: a JSON object that follows a schema. Claude returns it as a structured output (`output_config.format`); Gemini and Groq use their JSON mode with the schema in the prompt. Any failure, including JSON that doesn't parse or an answer that was cut off, raises `LLMError`.
+  - `ai/extract.py`: `smart_extract()` runs the patterns, then, with a key, the LLM reads the message with the visitor's last four messages ("same budget but in Bengaluru", "80-85 lakh ke beech"). Every LLM value is checked first (`clean_details`: a known city or locality, BHK 1-6, budgets ₹5 L-₹100 Cr, move-in within 5 years), and a budget pair never mixes the two extractors. New buyer detail `purpose` (`own_use` / `investment`), found by the patterns too; the assistant asks it last.
+  - `ai/classify.py`: end buyer, investor, tenant, broker or spam, with a confidence and a one-line reason, from the enquiry messages and chat: the LLM on masked text, or keyword rules without a key or when the call fails. `scoring/engine.py` runs it after the response is sent (a FastAPI background task) for every chat message and every enquiry with a message, skips it when the messages haven't changed, saves it on the visitor and rescores. A confident (0.7+) broker, spammer or tenant becomes Junk (Review with intent 70+).
+  - Simulator: a new junk kind, `tenant` (wants to rent), and an investor message among genuine buyers. Retrained as `lgbm-20261107-c41e90`; `ml/train.py` gives simulated visitors the keyword visitor type, as the backend does without a key.
+  - Dashboard: "Purpose" in the buyer details (the visitor type already showed in "Why this label"). `docs/CONTRACTS.md` and the README ("The LLM") updated.
+  - Checked: 110 tests pass and the frontend builds. Through the live API (template mode, throwaway database), 500 fresh simulated visitors (seed 7): 200/200 bots and 100/100 junk filtered out, including 18/18 tenants that only the visitor type catches; 200/200 genuine buyers kept (4 in Review). In chat, the assistant asks the purpose question and saves "for my family to live in" as `own_use`; a Hinglish rent question is classified as a tenant. Claude's structured-output and refusal-fallback request shape matches the Claude API reference.
 
 **Next**
-- Part 6: LLM detail extraction and visitor-type classification.
+- Week 3: write the build plan and wait for the go-ahead.
 
 **Notes**
+- With an LLM key, each chat message now makes up to three LLM calls: detail extraction and the reply while the visitor waits, then the visitor type in the background.
 - The user said "continue" without answering the plan's two decisions, so the plan's recommendations apply: the contract additions as planned (written into `docs/CONTRACTS.md` as each part lands) and same-Wi-Fi testing.
 - Teammates: run `pip install -r requirements.txt` in `backend/` again for the new packages, and `pip install -r ml/requirements.txt` (from the repo root, into the same venv) to train or run the bots.
 - Simulated results are near perfect (AUC 1.0) because the simulator is easy to separate; the real test set is the honest number. Two simulator quirks were fixed so the model leans on behaviour: shared IPs (now 30% of people, and bots often use proxies) and full-screen windows (5% of desktop users).

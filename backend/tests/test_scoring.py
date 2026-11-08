@@ -376,3 +376,83 @@ def test_new_columns_are_added_to_an_old_database(tmp_path, monkeypatch):
     assert {"label", "intent_score", "human_prob", "score", "scored_at", "visitor_type"} <= columns
     with old.connect() as connection:
         assert connection.execute(text("SELECT site FROM visitors")).scalar() == "demo"  # nothing lost
+
+
+# ---------------------------------------------------------------- visitor type (Part 6)
+
+from app.ai import classify as classify_module  # noqa: E402
+from app.ai.classify import classify  # noqa: E402
+from app.ai.llm_client import LLMError  # noqa: E402
+from app.scoring.engine import classify_visitor  # noqa: E402
+
+
+@pytest.mark.parametrize(
+    ("texts", "profile", "kind"),
+    [
+        (["Is this flat available on rent? What is the monthly rent?"], {}, "tenant"),
+        (["Kya ye flat rent pe milega?"], {}, "tenant"),
+        (["I am a channel partner, share your inventory"], {}, "broker"),
+        (["Get 10x leads with our SEO services"], {}, "spam"),
+        (["Buying as an investment. What rental yield can I expect?"], {}, "investor"),  # rental yield: not a tenant
+        (["Is there any brokerage? I want to buy directly."], {"bhk": 3}, "end_buyer"),  # asks about brokerage: a buyer
+        (["Interested, please call me."], {}, None),  # nothing to go on
+    ],
+)
+def test_visitor_type_from_keywords(texts, profile, kind):
+    result = classify(texts, profile, use_llm=False)
+    assert (result or {}).get("type") == kind
+
+
+class FakeClassifier:
+    def __init__(self, answer=None, error=None):
+        self.answer, self.error, self.sent = answer, error, []
+
+    def available(self):
+        return True
+
+    def generate_json(self, system, messages, schema, **kwargs):
+        self.sent.append(messages[0]["content"])
+        if self.error:
+            raise self.error
+        return self.answer
+
+
+def test_visitor_type_from_the_llm_with_masked_text(monkeypatch):
+    fake = FakeClassifier({"type": "broker", "confidence": 1.7, "reason": "Asks for commission for clients"})
+    monkeypatch.setattr(classify_module, "llm", fake)
+    result = classify(["Call me on 9822012345, what do you pay CPs?"], {})
+    assert result == {"type": "broker", "confidence": 1.0, "reason": "Asks for commission for clients", "source": "llm"}
+    assert "9822012345" not in fake.sent[0] and "[phone]" in fake.sent[0]
+    monkeypatch.setattr(classify_module, "llm", FakeClassifier({"type": "unknown", "confidence": 0.2, "reason": "-"}))
+    assert classify(["hello"], {}) is None
+
+
+def test_visitor_type_falls_back_to_keywords(monkeypatch):
+    monkeypatch.setattr(classify_module, "llm", FakeClassifier(error=LLMError("rate limit")))
+    assert classify(["Looking for a 2BHK on rent"], {})["source"] == "keywords"
+
+
+def test_a_confident_tenant_is_junk_unless_buying_signals_are_strong():
+    tenant = {"type": "tenant", "confidence": 0.8, "reason": "Wants to rent, not buy", "source": "keywords"}
+    casual = score_record(visitor(events=browsing(pages_open=2)), visitor_type=tenant)
+    assert casual.label == "Junk" and "Wants to rent, not buy" in casual.reasons
+    assert score_record(serious_buyer(), visitor_type=tenant).label == "Review"
+    unsure = {**tenant, "confidence": 0.5}
+    assert score_record(visitor(events=browsing(pages_open=2), leads=[lead()]), visitor_type=unsure).label == "Review"
+
+
+def test_enquiries_are_classified_after_the_response(client):
+    def enquire(message):
+        visitor_id, session_id = str(uuid.uuid4()), str(uuid.uuid4())
+        post_batch(client, visitor_id, session_id, browsing(pages_open=2), {"webdriver": False, "languages": 2})
+        body = {"visitor_id": visitor_id, "session_id": session_id, "name": "Ravi Kumar",
+                "phone": "9" + str(random.randint(100_000_000, 999_999_999)), "message": message, "form_fill_ms": 40_000}
+        assert client.post("/leads", json=body).status_code == 201
+        return visitor_id, client.get(f"/visitors/{visitor_id}").json()["visitor"]
+
+    tenant_id, tenant = enquire("Is this flat available on rent? What is the monthly rent?")
+    assert tenant["label"] == "Junk" and tenant["score"]["visitor_type"] == "tenant"
+    assert "Wants to rent, not buy" in tenant["score"]["reasons"]
+    _, investor = enquire("Buying as an investment. What rental yield can I expect?")
+    assert investor["score"]["visitor_type"] == "investor" and investor["label"] not in ("Junk", "Bot")
+    assert classify_visitor(tenant_id) is None  # the same messages are never classified twice

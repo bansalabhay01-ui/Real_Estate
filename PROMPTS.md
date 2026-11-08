@@ -88,3 +88,31 @@ Every prompt typed to Claude Code in this project is added below automatically, 
 ### 2026-11-07 10:52 · bansalabhay01-ui
 
 > claude continue
+
+### 2026-11-08 17:47 · bansalabhay01-ui
+
+> read this project and start building it further
+
+### 2026-11-08 17:48 · bansalabhay01-ui
+
+> <task-notification>
+> <task-id>b9yq4o6wn</task-id>
+> <tool-use-id>toolu_011YmZh6LgW2KeKsbEehWjjt</tool-use-id>
+> <output-file>C:\Users\91700\AppData\Local\Temp\claude\d62fa1fe116bc204\ec0e0617-1da6-4c92-ac7b-03070b4f1991\tasks\b9yq4o6wn.output</output-file>
+> <status>completed</status>
+> <summary>Background command "Build the frontend to check it compiles" completed (exit code 0)</summary>
+> </task-notification>
+
+### 2026-11-08 17:49 · bansalabhay01-ui
+
+> <task-notification>
+> <task-id>bc95mjnt7</task-id>
+> <tool-use-id>toolu_016tvLXfY6czAA7Nk93dBUpK</tool-use-id>
+> <output-file>C:\Users\91700\AppData\Local\Temp\claude\d62fa1fe116bc204\ec0e0617-1da6-4c92-ac7b-03070b4f1991\tasks\bc95mjnt7.output</output-file>
+> <status>completed</status>
+> <summary>Background command "Run the backend test suite" completed (exit code 0)</summary>
+> </task-notification>
+
+### 2026-11-08 17:53 · bansalabhay01-ui
+
+> this is my resume first you have to rate this resume and give me areas for improvements after that fix the areas where this resume should be improved and again rate it

@@ -38,6 +38,7 @@ function budget(profile) {
 function BuyerDetails({ profile }) {
   const unknown = <span className="text-muted">Not shared yet</span>;
   const loan = profile.loan_needed === true ? "Needs a loan" : profile.loan_needed === false ? "No loan needed" : null;
+  const purpose = { own_use: "To live in", investment: "An investment" }[profile.purpose] ?? null;
   return (
     <dl className="text-sm">
       <Row label="Location">{[profile.locality, profile.city].filter(Boolean).join(", ") || unknown}</Row>
@@ -45,6 +46,7 @@ function BuyerDetails({ profile }) {
       <Row label="Budget">{budget(profile) ?? unknown}</Row>
       <Row label="Move-in">{profile.timeline_months ? `Within ${profile.timeline_months} months` : unknown}</Row>
       <Row label="Home loan">{loan ?? unknown}</Row>
+      <Row label="Purpose">{purpose ?? unknown}</Row>
       <Row label="Language">{LANGUAGES[profile.language] ?? unknown}</Row>
     </dl>
   );

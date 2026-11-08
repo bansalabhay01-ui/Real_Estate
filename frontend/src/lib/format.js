@@ -58,5 +58,7 @@ export function profilePhrases(profile = {}) {
   if (profile.timeline_months) phrases.push(`moving in ${profile.timeline_months} mo`);
   if (profile.loan_needed === true) phrases.push("needs a loan");
   if (profile.loan_needed === false) phrases.push("no loan");
+  if (profile.purpose === "own_use") phrases.push("to live in");
+  if (profile.purpose === "investment") phrases.push("as an investment");
   return phrases;
 }

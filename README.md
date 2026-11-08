@@ -186,7 +186,19 @@ The tests use a temporary database and never call a real LLM. The Claude request
 The assistant works without a key, answering from templates. To use an LLM, put one key in `backend/.env`:
 `ANTHROPIC_API_KEY` (Claude; the default model is `claude-opus-5-5`, and `LLM_MODEL=claude-haiku-5-5` costs much
 less), `GEMINI_API_KEY` or `GROQ_API_KEY`. `GET /health` shows which one is in use. If a call fails, the assistant
-falls back to templates, so a demo never breaks. Phone numbers and emails are masked before text reaches an LLM.
+falls back to templates, so a demo never breaks. Phone numbers and emails are masked before text reaches an LLM,
+and names are never sent.
+
+With a key, the LLM does three jobs, each falling back to rules if a call fails:
+
+- **Replies** in the visitor's language (one call per chat message).
+- **Detail extraction** (`backend/app/ai/extract.py`): reads the message with the last few turns ("same budget,
+  but in Bengaluru", "80-85 lakh ke beech"). Every value is checked (a known city, a sensible budget, BHK 1 to 6)
+  before it's saved. This is one more short call per chat message; Claude returns it as a structured output.
+- **Visitor type** (`backend/app/ai/classify.py`): end buyer, investor, tenant, broker or spam, from the enquiry
+  message and chat, worked out after the response is sent so nobody waits. It runs again only when the messages
+  change. Without a key, keyword rules do this ("on rent", "channel partner", "rental yield"); a confident broker,
+  spam or tenant is labelled Junk.
 
 ## Team
 

@@ -14,10 +14,10 @@ Labels and kinds:
              form_bot (enquiry with little or no browsing, often fills the honeypot), click_bot (scripted clicks
              at fixed intervals), stealth_form (hides webdriver, copies a real browser, fakes mouse moves and typing)
     junk     fake_details (real browsing, fake phone/email), broker (rival broker fishing for inventory),
-             spam (promotional message)
+             spam (promotional message), tenant (wants to rent, not buy)
     genuine  serious (focused search, EMI, floor plan, enquiry; often comes back on later days), casual (a short
-             look, rarely an enquiry). Some genuine buyers are NRIs (foreign time zone and number), use browser
-             autofill (a 1-3 second form), a privacy browser (UTC time zone) or an ad blocker (no tracking at all).
+             look, rarely an enquiry). Some genuine buyers are NRIs (foreign time zone and number), investors, use
+             browser autofill (a 1-3 second form), a privacy browser (UTC time zone) or an ad blocker (no tracking).
 
 Chat messages are saved in the file but only sent with --chat, because the backend may call a paid LLM.
 """
@@ -74,8 +74,14 @@ GENUINE_MESSAGES = [
     "Please call me after 6 pm. Is the price negotiable?",
     "Interested in a site visit this weekend.",
     "Looking to move in within 3 months. Need a home loan too.",
+    "Buying as an investment. What rental yield can I expect?",
     "",
 ]
+TENANT_MESSAGES = [
+    "Is this flat available on rent? What is the monthly rent?",
+    "Looking for a 2BHK on rent near my office, around 25k a month.",
+]
+TENANT_CHAT = ["Kya ye flat rent pe milega? Monthly rent kitna hai?", "Do you have anything for rent in {city}?"]
 STEALTH_MESSAGES = ["Interested, please call me.", "Please share the price list.", "Need more details about this project."]
 CHAT_MESSAGES = {
     "en": ["{bhk}BHK under {budget}L in {city}?", "Is it ready to move?", "Need a home loan, moving in 3 months"],
@@ -403,13 +409,25 @@ def make_stealth_bot(rng: random.Random) -> Visitor:
 
 
 def make_junk(rng: random.Random) -> Visitor:
-    kind = rng.choices(["fake_details", "broker", "spam"], weights=[5, 3, 2])[0]
+    kind = rng.choices(["fake_details", "broker", "spam", "tenant"], weights=[5, 3, 2, 2])[0]
     mobile = rng.random() < 0.6
     ua = rng.choice(UA_MOBILE if mobile else UA_DESKTOP)
     visitor = Visitor(rng, "junk", kind, user_agent=ua, context=human_context(rng, mobile), mobile=mobile)
     home = rng.choice(LISTINGS)
     path = f"/property/{home['id']}"
-    if kind == "broker":  # looks at many homes across cities, often comes back, then fishes for inventory
+    if kind == "tenant":  # a real person and real details, but looking to rent: not a lead for a sales team
+        visit = visitor.visit(human_ip(rng))
+        for other in rng.sample(LISTINGS, rng.randint(2, 4)):
+            visit.human_page(f"/property/{other['id']}", rng.uniform(15, 60))
+            visit.wait(1, 5)
+        if rng.random() < 0.5:
+            visit.say(rng.choice(TENANT_CHAT).format(city=home["city"]))
+        name, email = person(rng)
+        message = rng.choice(TENANT_MESSAGES)
+        visit.human_page(path, rng.uniform(20, 60))
+        visit.submit(path, home["id"], name=name, phone_number=phone(rng), email=email, message=message,
+                     fill_ms=rng.randint(20_000, 80_000), keys=typed_keys(rng, name, email, message))
+    elif kind == "broker":  # looks at many homes across cities, often comes back, then fishes for inventory
         for number in range(2 if rng.random() < 0.3 else 1):
             visit = visitor.visit(human_ip(rng))
             for other in rng.sample(LISTINGS, rng.randint(6, 12)):

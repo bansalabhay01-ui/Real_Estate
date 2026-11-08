@@ -32,6 +32,7 @@ import numpy as np  # noqa: E402
 from sklearn.metrics import precision_score, recall_score, roc_auc_score  # noqa: E402
 from sklearn.model_selection import train_test_split  # noqa: E402
 
+from app.ai.classify import classify  # noqa: E402
 from app.ai.extract import profile_from_messages  # noqa: E402
 from app.scoring.combine import score_record  # noqa: E402
 from app.scoring.features import MODEL_FEATURES, add_network_counts, cut_record, model_vector, visitor_features  # noqa: E402
@@ -84,6 +85,13 @@ def rows_for(records: list[dict], rng: random.Random, cuts: int) -> tuple[list[l
     return x, y
 
 
+def visitor_type(record: dict) -> dict | None:
+    """The keyword visitor type from a simulated visitor's messages, as the backend works it out without a key."""
+    texts = [lead.get("message") or "" for lead in record.get("leads") or []]
+    texts += [message["text"] for message in record.get("chat") or []]
+    return classify(texts, record.get("profile") or {}, use_llm=False)
+
+
 def safe_cut(human_probs: list[float], limit: float, ceiling: float) -> float:
     """The highest cut-off (at most `ceiling`) that puts no more than `limit` of real people below it."""
     for cut in np.arange(ceiling, 0.0, -0.01):
@@ -130,17 +138,18 @@ def real_test_set(model: HumanModel) -> list[tuple[str, str]] | None:
             return None
     from app.db import SessionLocal, init_db
     from app.models import Visitor
-    from app.scoring.engine import load_record
+    from app.scoring.engine import known_type, load_record
     from sqlalchemy import select
 
     init_db()  # adds any new columns, as the backend does at startup
     rows = []
     with SessionLocal() as db:
-        for visitor_id, context in db.execute(select(Visitor.id, Visitor.context)).all():
+        for visitor_id, context, saved_type in db.execute(select(Visitor.id, Visitor.context, Visitor.visitor_type)).all():
             truth = (context or {}).get("test_label")
             if truth:
                 record = load_record(db, visitor_id)
-                rows.append((f"{truth} (tester)", score_record(record, model=model).label))
+                label = score_record(record, model=model, visitor_type=known_type(saved_type)).label
+                rows.append((f"{truth} (tester)", label))
     return rows
 
 
@@ -197,7 +206,7 @@ def main() -> int:
     model = HumanModel(lgb.Booster(model_str=model_text), info)
 
     # The whole engine (rules + model + intent) on unseen simulated visitors, whole visits only.
-    pipeline = [(f"{r['label']}/{r['kind']}", score_record(r, model=model).label) for r in test]
+    pipeline = [(f"{r['label']}/{r['kind']}", score_record(r, model=model, visitor_type=visitor_type(r)).label) for r in test]
     print_confusion("Whole engine on unseen simulated visitors:", confusion(pipeline))
     simulated = headline(pipeline)
     print("  " + ", ".join(f"{name.replace('_', ' ')} {value:.1%}" for name, value in simulated.items() if value is not None))

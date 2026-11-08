@@ -18,7 +18,7 @@ from ..models import ChatMessage, Visitor
 from ..schemas import ChatIn, ChatMessageOut, ChatOut, Listing, VisitorOut
 from ..tracking import get_or_create_visitor, run_in_session, visitor_out
 from ..utils import utcnow
-from .extract import extract_details, merge_profile
+from .extract import merge_profile, smart_extract
 from .llm_client import LLMError, llm
 from .privacy import mask_pii
 from .rag import SearchResult, find_listings
@@ -36,19 +36,19 @@ QUESTIONS = {
     "budget": "What budget do you have in mind? For example, under ₹90 L or up to ₹1.5 Cr.",
     "timeline": "When are you planning to move in: right away, within 6 months, or later?",
     "loan": "Will you need a home loan? Each property page has an EMI calculator.",
+    "purpose": "Is the home for you to live in, or an investment?",
 }
 
 
 def handle_chat(payload: ChatIn, ip: str | None, user_agent: str | None) -> tuple[ChatOut, VisitorOut | None]:
-    found = extract_details(payload.message)
-
     # 1. What we already know (a short database read).
     with SessionLocal() as db:
         visitor = db.get(Visitor, payload.visitor_id) if payload.visitor_id else None
         old_profile = dict(visitor.profile or {}) if visitor else {}
         history = _recent_history(db, payload.visitor_id) if visitor else []
 
-    # 2. Find homes and write the reply (may call the LLM, so no database session is held open).
+    # 2. Pick out the details, find homes and write the reply (may call the LLM, so no database session is open).
+    found = smart_extract(payload.message, [row.text for row in history if row.role == "user"])
     profile = merge_profile(old_profile, found)
     current = get_listing(payload.listing_id) if payload.listing_id else None
     result = _search(profile, found, payload.message, current)
@@ -99,6 +99,7 @@ def missing_details(profile: dict) -> list[str]:
         "budget": "budget_max" in profile or "budget_min" in profile,
         "timeline": "timeline_months" in profile,
         "loan": "loan_needed" in profile,
+        "purpose": "purpose" in profile,
     }
     return [key for key in QUESTIONS if not known[key]]
 
