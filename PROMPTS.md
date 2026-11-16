@@ -113,6 +113,7 @@ Every prompt typed to Claude Code in this project is added below automatically, 
 > <summary>Background command "Run the backend test suite" completed (exit code 0)</summary>
 > </task-notification>
 
-### 2026-11-08 17:53 · bansalabhay01-ui
+### 2026-11-16 11:35 · bansalabhay01-ui
 
-> this is my resume first you have to rate this resume and give me areas for improvements after that fix the areas where this resume should be improved and again rate it
+> (Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned) ; (& c:\Users\91700\OneDrive\Desktop\real_estate\backend\.venv\Scripts\Activate.ps1)
+> claude doctor
