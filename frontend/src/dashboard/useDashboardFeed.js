@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { getStats, getVisitors } from "../lib/api";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { getDemoStatus, getStats, getVisitors } from "../lib/api";
 import { WS_URL } from "../lib/config";
 
 const MAX_VISITORS = 500;
 const FILTERED_LIMIT = 200;
+const LIVE_STATS_MS = 1200; // how often the headline numbers refresh while simulated traffic pours in
 
 // Live dashboard data: a snapshot when the WebSocket connects, then visitor, enquiry and score updates.
 // Reconnects on its own (1 s, 2 s, 4 s ... up to 10 s) and gets a fresh snapshot each time.
@@ -14,6 +15,22 @@ export function useDashboardFeed() {
   const [status, setStatus] = useState("connecting"); // connecting | live | offline
   const [stats, setStats] = useState(null);
   const [hotAlerts, setHotAlerts] = useState([]); // visitors who just turned Hot, newest first
+  const [demo, setDemo] = useState(null); // the live demo tools: simulated run, scoreboard, real bot
+  const statsLoadedAt = useRef(0);
+
+  const loadStats = useCallback(() => {
+    statsLoadedAt.current = Date.now();
+    return getStats()
+      .then(setStats)
+      .catch(() => {});
+  }, []);
+  const refreshDemo = useCallback(
+    () =>
+      getDemoStatus()
+        .then((data) => setDemo((current) => ({ ...current, ...data })))
+        .catch(() => {}),
+    [],
+  );
 
   useEffect(() => {
     let socket;
@@ -26,12 +43,15 @@ export function useDashboardFeed() {
       socket.onopen = () => {
         attempts = 0;
         setStatus("live");
+        refreshDemo();
       };
       socket.onmessage = (event) => {
         const message = JSON.parse(event.data);
         if (message.type === "snapshot") {
           setVisitors(message.visitors);
           setLeads(message.leads);
+          loadStats();
+          refreshDemo();
         } else if (message.type === "visitor_update") {
           const visitor = message.visitor;
           setVisitors((current) => [visitor, ...current.filter((item) => item.id !== visitor.id)].slice(0, MAX_VISITORS));
@@ -46,6 +66,19 @@ export function useDashboardFeed() {
             const alert = { visitorId: message.visitor_id, reason: message.reasons?.[0] ?? "", at: Date.now() };
             setHotAlerts((current) => [alert, ...current.filter((item) => item.visitorId !== alert.visitorId)].slice(0, 20));
           }
+        } else if (message.type === "simulation_started") {
+          setDemo((current) => ({ ...current, running: true, sent: 0, total: message.total, labels: {}, scoreboard: null }));
+        } else if (message.type === "simulation_progress") {
+          setDemo((current) => ({ ...current, running: true, sent: message.sent, total: message.total, labels: message.labels }));
+          if (Date.now() - statsLoadedAt.current > LIVE_STATS_MS) loadStats();
+        } else if (message.type === "simulation_done") {
+          setDemo((current) => ({ ...current, running: false, scoreboard: message.scoreboard }));
+          loadStats();
+          refreshDemo();
+        } else if (message.type === "bot_started") {
+          setDemo((current) => ({ ...current, bot_running: true, bot_result: null }));
+        } else if (message.type === "bot_finished") {
+          setDemo((current) => ({ ...current, bot_running: false, bot_result: message }));
         }
       };
       socket.onclose = () => {
@@ -63,29 +96,21 @@ export function useDashboardFeed() {
       clearTimeout(retryTimer);
       socket?.close();
     };
-  }, []);
+  }, [loadStats, refreshDemo]);
 
   // Headline numbers come from the API (the list only holds recent visitors).
   useEffect(() => {
-    let cancelled = false;
-    const load = () =>
-      getStats()
-        .then((data) => !cancelled && setStats(data))
-        .catch(() => {});
-    load();
-    const timer = setInterval(load, 5000);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, []);
+    loadStats();
+    const timer = setInterval(loadStats, 5000);
+    return () => clearInterval(timer);
+  }, [loadStats]);
 
   const dismissHotAlert = useCallback(
     (visitorId) => setHotAlerts((current) => current.filter((item) => item.visitorId !== visitorId)),
     [],
   );
 
-  return { visitors, leads, updatedAt, status, stats, hotAlerts, dismissHotAlert };
+  return { visitors, leads, updatedAt, status, stats, hotAlerts, dismissHotAlert, demo };
 }
 
 const byRecent = (a, b) => Date.parse(b.last_seen) - Date.parse(a.last_seen);

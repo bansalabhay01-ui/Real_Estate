@@ -313,3 +313,77 @@ class FeedbackOut(BaseModel):
     label: str
     note: str | None
     created_at: UTCDateTime
+
+
+# ---------------------------------------------------------------- live demo tools (dashboard)
+
+
+class SimulateIn(BaseModel):
+    bots: int = Field(200, ge=0, le=500)
+    junk: int = Field(30, ge=0, le=200)
+    genuine: int = Field(20, ge=0, le=200)
+    seconds: float = Field(30, ge=0, le=120)  # the run is spread over this long, so an audience can watch it
+    seed: int | None = None  # the same seed gives the same visitors
+
+    @model_validator(mode="after")
+    def _needs_visitors(self) -> "SimulateIn":
+        if self.bots + self.junk + self.genuine == 0:
+            raise ValueError("Ask for at least one visitor")
+        return self
+
+
+class SimulationStarted(BaseModel):
+    ok: bool = True
+    run_id: str
+    total: int
+    seconds: float
+
+
+class SimulationKindOut(BaseModel):
+    kind: str  # e.g. "bot/scraper", "genuine/serious"
+    total: int
+    labels: dict[str, int]
+
+
+class ScoreboardOut(BaseModel):
+    """How a simulated run was sorted: what each visitor really was against the label it got."""
+
+    run_id: str
+    total: int
+    seconds: float
+    bots_total: int
+    bots_blocked: int  # labelled Bot or Junk
+    junk_total: int
+    junk_filtered: int  # labelled Bot or Junk
+    genuine_total: int
+    genuine_kept: int  # labelled anything but Bot or Junk
+    genuine_labels: dict[str, int]  # e.g. {"Hot": 4, "Warm": 9, "Cold": 7}
+    kinds: list[SimulationKindOut]
+
+
+class DemoStatusOut(BaseModel):
+    running: bool
+    run_id: str | None = None
+    sent: int = 0
+    total: int = 0
+    labels: dict[str, int] = {}  # visitors of this run per label so far
+    scoreboard: ScoreboardOut | None = None  # the latest finished run
+    simulated_visitors: int = 0  # visitors the button made that are still in the database
+    bot_available: bool = False  # real Playwright bots only run where the backend's laptop has them installed
+    bot_running: bool = False
+
+
+class SimulatedRemoved(BaseModel):
+    ok: bool = True
+    removed: int
+
+
+class BotRunIn(BaseModel):
+    kind: Literal["naive", "stealth", "scraper"] = "stealth"
+    site: Annotated[str, _clip(200)] = "http://localhost:5173"  # the demo site the bot opens
+    headed: bool = True  # show the browser window (what an audience wants to see)
+
+
+class BotRunStarted(BaseModel):
+    ok: bool = True
+    kind: str

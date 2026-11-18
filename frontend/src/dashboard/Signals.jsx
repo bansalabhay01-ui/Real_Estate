@@ -16,7 +16,8 @@ export function Chip({ tone, children }) {
 }
 
 export function shortId(id) {
-  return id.startsWith("nosdk-") ? `no-sdk ${id.slice(6, 12)}` : id.slice(0, 8);
+  if (id.startsWith("nosdk-")) return `no-sdk ${id.slice(6, 12)}`;
+  return id.startsWith("sim-") ? `sim ${id.slice(4, 10)}` : id.slice(0, 8);
 }
 
 const LABEL_ICONS = {
@@ -78,6 +79,7 @@ export function SignalChips({ visitor }) {
   }
   if (visitor.chat_count > 0) chips.push({ key: "chat", tone: "blue", text: "Chatted" });
   if (visitor.test_label) chips.push({ key: "test", tone: "test", text: `Test: ${visitor.test_label}` });
+  if (visitor.id.startsWith("sim-")) chips.push({ key: "simulated", tone: "test", text: "Simulated" });
 
   if (chips.length === 0) return <span className="text-muted">None yet</span>;
   return (

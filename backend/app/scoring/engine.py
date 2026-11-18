@@ -21,7 +21,7 @@ from ..db import SessionLocal
 from ..models import ChatMessage, Event, Lead, Score, Visitor, VisitSession
 from ..realtime import hub
 from ..schemas import VisitorOut
-from ..tracking import visitor_out
+from ..tracking import list_leads, list_visitors, visitor_out
 from ..utils import utcnow
 from .combine import score_record
 from .features import NAN
@@ -94,6 +94,16 @@ async def publish(visitor: VisitorOut | None, update: ScoreUpdate | None) -> Non
         })  # fmt: skip
 
 
+async def broadcast_snapshot() -> None:
+    """Dashboards replace their lists, as when they connect (after a rescore, or when visitors were removed)."""
+    visitors, leads = await run_in_threadpool(list_visitors, 50), await run_in_threadpool(list_leads, 20)
+    await hub.broadcast({
+        "type": "snapshot",
+        "visitors": [visitor.model_dump(mode="json") for visitor in visitors],
+        "leads": [lead.model_dump(mode="json") for lead in leads],
+    })  # fmt: skip
+
+
 def known_type(saved: dict | None) -> dict | None:
     """The saved visitor type without bookkeeping, or None when the messages didn't say."""
     if not saved or not saved.get("type"):
@@ -101,10 +111,11 @@ def known_type(saved: dict | None) -> dict | None:
     return {key: value for key, value in saved.items() if key != "text_hash"}
 
 
-def classify_visitor(visitor_id: str) -> ScoreUpdate | None:
+def classify_visitor(visitor_id: str, *, use_llm: bool = True) -> ScoreUpdate | None:
     """Work out the visitor type from their messages (the LLM, or keywords), save it and rescore.
 
     Skipped when the messages haven't changed since the last time, so a rescore never pays for another LLM call.
+    use_llm=False keeps to the keyword rules (simulated traffic must never spend LLM credits).
     """
     with SessionLocal() as db:
         visitor = db.get(Visitor, visitor_id)
@@ -119,7 +130,7 @@ def classify_visitor(visitor_id: str) -> ScoreUpdate | None:
     digest = hashlib.sha1(json.dumps([texts, profile.get("purpose")], ensure_ascii=False).encode()).hexdigest()[:16]
     if saved.get("text_hash") == digest:
         return None
-    result = classify(texts, profile)  # may call the LLM: no database session is open
+    result = classify(texts, profile, use_llm=use_llm)  # may call the LLM: no database session is open
     with SessionLocal() as db:
         visitor = db.get(Visitor, visitor_id)
         visitor.visitor_type = {**(result or {}), "text_hash": digest}
@@ -127,11 +138,11 @@ def classify_visitor(visitor_id: str) -> ScoreUpdate | None:
     return score_safely(visitor_id)
 
 
-def classify_safely(visitor_id: str | None) -> ScoreUpdate | None:
+def classify_safely(visitor_id: str | None, *, use_llm: bool = True) -> ScoreUpdate | None:
     if not visitor_id:
         return None
     try:
-        return classify_visitor(visitor_id)
+        return classify_visitor(visitor_id, use_llm=use_llm)
     except Exception:
         log.exception("Classifying visitor %s failed", visitor_id)
         return None

@@ -117,3 +117,11 @@ Every prompt typed to Claude Code in this project is added below automatically, 
 
 > (Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned) ; (& c:\Users\91700\OneDrive\Desktop\real_estate\backend\.venv\Scripts\Activate.ps1)
 > claude doctor
+
+### 2026-11-18 14:35 · bansalabhay01-ui
+
+> claude --resume
+
+### 2026-11-18 14:39 · bansalabhay01-ui
+
+> start compleating the next part of this project and complete the whole project making it according to the plan you have created and also after creating each task and session push it to github

@@ -7,7 +7,11 @@ async function request(path, { method = "GET", body } = {}) {
     headers: body ? { "Content-Type": "application/json" } : undefined,
     body: body ? JSON.stringify(body) : undefined,
   });
-  if (!response.ok) throw new Error(`${method} ${path} failed with status ${response.status}`);
+  if (!response.ok) {
+    const problem = await response.json().catch(() => null);
+    const text = typeof problem?.detail === "string" ? problem.detail : `${method} ${path} failed with status ${response.status}`;
+    throw Object.assign(new Error(text), { status: response.status });
+  }
   return response.json();
 }
 
@@ -39,3 +43,9 @@ export function getVisitors({ label, sort = "recent", limit = 200 } = {}) {
 }
 
 export const getStats = () => request("/stats");
+
+// The live demo tools on the dashboard.
+export const getDemoStatus = () => request("/demo/status");
+export const startSimulation = (numbers) => request("/demo/simulate", { method: "POST", body: numbers });
+export const clearSimulated = () => request("/demo/simulated", { method: "DELETE" });
+export const runBot = (kind, site) => request("/demo/bot", { method: "POST", body: { kind, site } });

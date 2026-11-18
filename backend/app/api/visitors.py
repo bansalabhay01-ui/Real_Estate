@@ -5,10 +5,9 @@ from typing import Literal
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from fastapi.concurrency import run_in_threadpool
 
-from ..realtime import hub
 from ..schemas import RescoreOut, StatsOut, VisitorDetailOut, VisitorOut
-from ..scoring.engine import rescore_all
-from ..tracking import dashboard_stats, list_leads, list_visitors, visitor_detail
+from ..scoring.engine import broadcast_snapshot, rescore_all
+from ..tracking import dashboard_stats, list_visitors, visitor_detail
 
 router = APIRouter(tags=["visitors"])
 
@@ -42,12 +41,7 @@ def get_visitor(visitor_id: str) -> VisitorDetailOut:
 
 async def _rescore_and_refresh() -> None:
     await run_in_threadpool(rescore_all)
-    visitors, leads = await run_in_threadpool(list_visitors, 50), await run_in_threadpool(list_leads, 20)  # as on connect
-    await hub.broadcast({  # dashboards replace their lists, as when they connect
-        "type": "snapshot",
-        "visitors": [visitor.model_dump(mode="json") for visitor in visitors],
-        "leads": [lead.model_dump(mode="json") for lead in leads],
-    })  # fmt: skip
+    await broadcast_snapshot()
 
 
 @router.post("/scoring/rescore", response_model=RescoreOut, tags=["scoring"])

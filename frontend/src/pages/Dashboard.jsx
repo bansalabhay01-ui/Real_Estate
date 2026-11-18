@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { PlanMark } from "../components/icons";
 import { LABEL_INFO, LABELS } from "../dashboard/describe";
 import { IntentMeter, LabelBadge, LeadChecks, shortId, SignalChips } from "../dashboard/Signals";
+import SimulateTraffic from "../dashboard/SimulateTraffic";
 import { useDashboardFeed, useFilteredVisitors } from "../dashboard/useDashboardFeed";
 import VisitorDetail from "../dashboard/VisitorDetail";
 import { profilePhrases, timeAgo } from "../lib/format";
@@ -268,7 +269,7 @@ function HotAlert({ alerts, onView, onDismiss }) {
 }
 
 export default function Dashboard() {
-  const { visitors, leads, updatedAt, status, stats, hotAlerts, dismissHotAlert } = useDashboardFeed();
+  const { visitors, leads, updatedAt, status, stats, hotAlerts, dismissHotAlert, demo } = useDashboardFeed();
   const [selectedId, setSelectedId] = useState(null);
   const [now, setNow] = useState(() => Date.now());
   const [filter, setFilter] = useState("All");
@@ -321,6 +322,12 @@ export default function Dashboard() {
             value={stats ? (stats.labels?.Bot ?? 0) + (stats.labels?.Junk ?? 0) : undefined}
           />
         </dl>
+
+        <div className="mt-6">
+          <Panel id="demo-heading" title="Live demo" note="Send an attack and watch LeadOps sort it.">
+            <SimulateTraffic demo={demo} />
+          </Panel>
+        </div>
 
         <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
           <div className="flex min-w-0 flex-col gap-6">

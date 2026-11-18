@@ -545,6 +545,13 @@ def make_genuine(rng: random.Random) -> Visitor:
     return visitor
 
 
+def make_visitors(bots: int, junk: int, genuine: int, rng: random.Random) -> list[Visitor]:
+    """The mix of visitors, shuffled the way real traffic arrives (the dashboard's Simulate traffic button uses it too)."""
+    makers = [make_bot] * bots + [make_junk] * junk + [make_genuine] * genuine
+    rng.shuffle(makers)
+    return [maker(rng) for maker in makers]
+
+
 # ---------------------------------------------------------------- output
 
 
@@ -640,9 +647,7 @@ def main() -> int:
     args = parser.parse_args()
 
     rng = random.Random(args.seed)
-    makers = [make_bot] * args.bots + [make_junk] * args.junk + [make_genuine] * args.genuine
-    rng.shuffle(makers)
-    visitors = [maker(rng) for maker in makers]
+    visitors = make_visitors(args.bots, args.junk, args.genuine, rng)
 
     now_ms = int(time.time() * 1000)
     for visitor in visitors:

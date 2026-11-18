@@ -134,6 +134,10 @@ Request: `{"visitor_id": "...", "session_id": "...", "message": "3BHK under 90L 
 | `POST /chat`, `GET /chat/{visitor_id}` | the assistant and a visitor's conversation | C |
 | `POST /feedback`, `GET /feedback` | sales verdicts: `genuine` / `fake` / `converted` | B |
 | `WS /ws/dashboard` | live dashboard feed | B |
+| `POST /demo/simulate` | `{bots, junk, genuine, seconds, seed}` (defaults 200 / 30 / 20 over 30 s): send simulated traffic through the real ingestion code. `202 {"ok": true, "run_id": "...", "total": 250, "seconds": 30}`, `409` while a run is going | B |
+| `GET /demo/status` | `{running, run_id, sent, total, labels, scoreboard, simulated_visitors, bot_available, bot_running}` | B |
+| `DELETE /demo/simulated` | remove the visitors the button made (IDs starting `sim-`): `{"ok": true, "removed": 250}` | B |
+| `POST /demo/bot` | `{kind: "naive" / "stealth" / "scraper", site, headed}`: run one real Playwright bot on the backend's laptop. `501` where Playwright isn't installed, `422` for a site outside this laptop's network | B |
 | `GET /sdk/leadops.js` | the tracking script | A |
 | `GET /health` | `{status, llm, listings, model}`; `model` is the scoring model's version, or `fallback` | B |
 
@@ -152,6 +156,18 @@ Then, as things happen:
 {"type": "lead_created", "lead": LeadOut}
 {"type": "score_update", "visitor_id": "...", "label": "Hot", "previous_label": "Warm", "intent_score": 82,
  "human_prob": 0.99, "visitor_type": null, "reasons": ["3 visits over 2 days", "..."]}
+```
+
+The live demo tools add:
+
+```json
+{"type": "simulation_started", "run_id": "...", "total": 250}
+{"type": "simulation_progress", "run_id": "...", "sent": 120, "total": 250, "labels": {"Bot": 96, "Junk": 14, "Warm": 6}}
+{"type": "simulation_done", "run_id": "...", "scoreboard": {"run_id": "...", "total": 250, "seconds": 31.2,
+  "bots_total": 200, "bots_blocked": 200, "junk_total": 30, "junk_filtered": 30, "genuine_total": 20, "genuine_kept": 20,
+  "genuine_labels": {"Hot": 4, "Warm": 9, "Cold": 7}, "kinds": [{"kind": "bot/scraper", "total": 61, "labels": {"Bot": 61}}]}}
+{"type": "bot_started", "kind": "stealth"}
+{"type": "bot_finished", "kind": "stealth", "ok": true, "summary": "stealth #1: ... -> Bot: ..."}
 ```
 
 Every event batch, enquiry and chat message rescores its visitor, so each `visitor_update` carries the latest

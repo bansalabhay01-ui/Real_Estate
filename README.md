@@ -69,8 +69,9 @@ Open http://localhost:5173 for the demo site and http://localhost:5173/dashboard
    listings and saves the budget, BHK and city on the visitor.
 4. Send an enquiry from a property page. The dashboard shows its label and its checks: phone, email, name, message,
    the hidden honeypot field and how fast the form was filled in.
-5. Send simulated traffic: `python ml/simulator.py --send http://localhost:8000 --bots 20 --junk 5 --genuine 10 --report`.
-   Watch the dashboard sort it, with an alert for each new Hot lead.
+5. On the dashboard, press **Simulate traffic**: 200 bots, 30 junk leads and 20 real buyers arrive over about 30
+   seconds and are sorted live, ending with a scoreboard. **Run a real bot** opens a browser window and lets a
+   Playwright bot attack the site. **Clear simulated visitors** gets the dashboard ready for the next rehearsal.
 
 ## Simulator
 
@@ -80,7 +81,7 @@ for training. Each line is a *visitor record*, the same shape live scoring reads
 that hide `webdriver` and fake mouse moves, slow scrapers, buyers who come back on later days, NRI buyers with
 foreign numbers, browser autofill, privacy browsers and ad blockers. The same `--seed` gives the same data.
 `--send URL` also posts the visitors to a running backend. `--chat` sends their chat messages too, which calls your
-LLM if a key is set.
+LLM if a key is set. The dashboard's **Simulate traffic** button uses the same simulator and never calls an LLM.
 
 ## Playwright bots
 

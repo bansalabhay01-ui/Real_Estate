@@ -3,13 +3,28 @@
 A short diary of LeadOps work sessions, newest first. Claude saves each session by itself: whenever a piece of work is finished, and at the start of the next session if the last one wasn't saved. Each save updates this file, commits, and pushes to GitHub.
 
 ## Current status
-_Last updated: 2026-11-08_
+_Last updated: 2026-11-18_
 
-- **Phase:** Week 2 (Intelligence) is finished, all six parts, five days early (planned 6–13 Nov). Week 3 (Integration + Wow) is next. Deadline about 30 Nov 2026.
-- **Done:** the Week 1 foundation (demo property site, tracking SDK, FastAPI backend, a basic property assistant in English, Hinglish and Hindi, the live sales dashboard, the traffic simulator, the shared contracts draft) and all of Week 2 ("Week 2 Build Plan" in `LEADOPS_PLAN.md`): tester links for real test sessions; simulator v2, visitor features and bot/junk rules; the LightGBM human check with SHAP, intent points, labels and reasons, scored live; dashboard v1 with labels, filters, "Why this label" and Hot alerts; three real Playwright bots, all caught; LLM detail extraction and visitor-type classification (end buyer, investor, tenant, broker, spam). 110 tests pass. Roughly 56% of the whole plan.
-- **Next:** the user's go-ahead on the Week 3 build plan (end of `LEADOPS_PLAN.md`) and its four decisions, then Week 3 Part 1. Classmates can start test sessions now (README, "Collecting real test sessions"); the real test set has no human sessions yet.
-- **Blocked:** the LLM features (replies, extraction, visitor type) haven't been tried with a real API key yet; template mode and the keyword rules work, and Claude's request shape matches the API reference.
+- **Phase:** Week 3 (Integration + Wow) in progress: Part 1 of 6 done. Deadline about 30 Nov 2026.
+- **Done:** the Week 1 foundation (demo property site, tracking SDK, FastAPI backend, a basic property assistant in English, Hinglish and Hindi, the live sales dashboard, the traffic simulator, the shared contracts draft), all of Week 2 ("Week 2 Build Plan" in `LEADOPS_PLAN.md`: tester links, simulator v2, features and rules, the LightGBM human check with SHAP, intent points, labels and reasons, dashboard v1, three real Playwright bots, LLM extraction and visitor type) and Week 3 Part 1: the dashboard's Simulate traffic button with a live scoreboard, and Run a real bot. 118 tests pass.
+- **Next:** Week 3 Part 2: assistant v2 (LangGraph agent, brochures, EMI, site visits, Marathi). Classmates can start test sessions now (README, "Collecting real test sessions"); the real test set has no human sessions yet.
+- **Blocked:** the LLM features haven't been tried with a real API key (the user hasn't approved spending it); template mode and the keyword rules work, and Claude's request shape matches the API reference.
 - **Code:** https://github.com/bansalabhay01-ui/Real_Estate (branch `main`)
+
+---
+
+## 2026-11-18 · bansalabhay01-ui · Week 3 build
+
+**Done**
+- The user said to complete the project from the plan and push after each task, which lifts the 16 Nov pause on saving. The plan's recommended decisions apply: ask for consent before tracking, Marathi as the regional language, and the contract additions as listed. No real LLM key is used.
+- **Part 1, Simulate traffic and Run a real bot:**
+  - `backend/app/api/demo.py`: `POST /demo/simulate` makes visitors with `ml/simulator.py` (new `make_visitors()`) and feeds them through the real ingestion code, spread over about 30 seconds, ending with a scoreboard (`simulation_started` / `_progress` / `_done` on the WebSocket). `GET /demo/status`, `DELETE /demo/simulated` (visitors with `sim-` IDs only) and `POST /demo/bot` (runs a Playwright bot on the backend's laptop, local sites only).
+  - `backend/app/retention.py`: `erase_visitors()` removes a visitor and everything linked to it. `classify_visitor(use_llm=False)`: simulated traffic never calls an LLM.
+  - Dashboard: a "Live demo" panel (`frontend/src/dashboard/SimulateTraffic.jsx`) with the dialog, a progress bar, label counts as they arrive, the scoreboard, a breakdown by kind of visitor, Clear and Run a real bot. Simulated rows get a "Simulated" chip.
+  - Checked: 118 tests pass and the frontend builds. A headless Edge check passed 12/12 (a 60-visitor run through the button: 40/40 bots blocked, 10/10 junk filtered, 10/10 buyers kept; Clear; no sideways scroll at phone width; no page errors). The stealth bot launched through `POST /demo/bot` was labelled `Bot` by the ML model alone.
+
+**Next**
+- Week 3 Part 2: assistant v2.
 
 ---
 
