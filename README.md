@@ -68,9 +68,12 @@ Open http://localhost:5173 for the demo site and http://localhost:5173/dashboard
 3. Ask the assistant "3BHK under 90L in Pune?", "Pune mein 90 lakh tak 3BHK chahiye" or "पुण्यात 90 लाखांपर्यंत 3BHK हवा
    आहे". It answers from the listings and saves the budget, BHK and city on the visitor. Then try "What's the payment
    plan at Aranya Courtyard?", "EMI with 30% down?" and "Book a site visit on Saturday morning".
-4. Send an enquiry from a property page. The dashboard shows its label and its checks: phone, email, name, message,
+4. Keep browsing a home for a minute or two after using the EMI calculator: when you look serious but haven't left any
+   details, the assistant offers to send the floor plan on WhatsApp. Accept it and you arrive on the dashboard as a
+   lead "found by the assistant". A salesperson can also press **Send an offer now** on an anonymous Warm or Hot visitor.
+5. Send an enquiry from a property page. The dashboard shows its label and its checks: phone, email, name, message,
    the hidden honeypot field and how fast the form was filled in.
-5. On the dashboard, press **Simulate traffic**: 200 bots, 30 junk leads and 20 real buyers arrive over about 30
+6. On the dashboard, press **Simulate traffic**: 200 bots, 30 junk leads and 20 real buyers arrive over about 30
    seconds and are sorted live, ending with a scoreboard. **Run a real bot** opens a browser window and lets a
    Playwright bot attack the site. **Clear simulated visitors** gets the dashboard ready for the next rehearsal.
 
@@ -173,6 +176,22 @@ visit from the same device counts too. The dashboard shows a "Test" chip on thes
    network to Private (Settings > Network & internet).
 6. Share `http://192.168.1.23:5173/?lo_test=genuine&lo_tester=t01`, with your laptop's address. The site finds the
    API on the same laptop by itself.
+
+## The smart engagement trigger
+
+Most serious buyers leave without filling in a form. After each event batch, `backend/app/scoring/nudge.py` looks for a
+visitor who clearly looks human (`human_prob` 0.8 or more), has intent 40 or more, has left no contact details, isn't
+chatting, has spent at least a minute on this visit and is on a property page. They get one offer per visit, two a day
+at most, in their language: the floor plan on WhatsApp, a personal EMI plan, a site visit or a shortlist of homes.
+
+Any website using the SDK can show these offers:
+
+```js
+LeadOps.onNudge(function (offer) {
+  // offer.text, offer.cta, offer.kind, offer.listing_id
+  LeadOps.track("nudge_shown", { nudge_id: offer.id, kind: offer.kind });
+});
+```
 
 ## Tests
 

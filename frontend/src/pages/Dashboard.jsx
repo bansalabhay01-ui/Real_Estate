@@ -297,7 +297,13 @@ function HotAlert({ alerts, onView, onDismiss }) {
       {latest && (
         <div className="rounded-lg border border-blueprint/40 bg-white p-4 shadow-lg">
           <p className="flex flex-wrap items-center gap-2 font-semibold">
-            <LabelBadge label="Hot" /> New hot lead: visitor {shortId(latest.visitorId)}
+            {latest.found ? (
+              <>Found by the assistant: visitor {shortId(latest.visitorId)}</>
+            ) : (
+              <>
+                <LabelBadge label="Hot" /> New hot lead: visitor {shortId(latest.visitorId)}
+              </>
+            )}
           </p>
           {latest.reason && <p className="mt-1 text-sm text-ink-soft">{latest.reason}</p>}
           {others.length > 0 && (
@@ -374,11 +380,12 @@ export default function Dashboard() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-6">
-        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
           <StatTile label="Visitors" value={stats?.visitors} />
           <StatTile label="Active in the last 2 minutes" value={stats?.active_now} />
           <StatTile label="Enquiries" value={stats?.leads} />
           <StatTile label="Hot right now" value={stats ? (stats.labels?.Hot ?? 0) : undefined} />
+          <StatTile label="Found by the assistant" value={stats?.assistant_leads} />
           <StatTile
             label="Filtered out: bots and junk"
             value={stats ? (stats.labels?.Bot ?? 0) + (stats.labels?.Junk ?? 0) : undefined}

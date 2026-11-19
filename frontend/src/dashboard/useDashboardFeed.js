@@ -67,6 +67,10 @@ export function useDashboardFeed() {
           setUpdatedAt((current) => ({ ...current, [visitor.id]: Date.now() }));
         } else if (message.type === "lead_created") {
           setLeads((current) => [message.lead, ...current.filter((item) => item.id !== message.lead.id)]);
+          if (message.lead.source === "assistant_offer") {
+            const alert = { visitorId: message.lead.visitor_id, reason: message.lead.message ?? "", at: Date.now(), found: true };
+            setHotAlerts((current) => [alert, ...current.filter((item) => item.visitorId !== alert.visitorId)].slice(0, 20));
+          }
         } else if (message.type === "score_update") {
           setLeads((current) =>
             current.map((lead) => (lead.visitor_id === message.visitor_id ? { ...lead, label: message.label } : lead)),

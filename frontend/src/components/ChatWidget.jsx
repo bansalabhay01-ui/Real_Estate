@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, matchPath, useLocation } from "react-router";
 import { getChatHistory, sendChat } from "../lib/api";
 import { formatPrice, formatRupees } from "../lib/format";
-import { track, visitorIds } from "../lib/leadops";
+import { onNudge, track, visitorIds } from "../lib/leadops";
 import ContactCapture from "./ContactCapture";
 import { IconChat, IconClose, IconSend } from "./icons";
 
@@ -12,6 +12,8 @@ const SUGGESTIONS = [
   "पुण्यात 90 लाखांपर्यंत 3BHK हवा आहे",
   "What's the payment plan at Aranya Courtyard?",
 ];
+
+const NO_THANKS = { en: "No thanks", hinglish: "Nahi, shukriya", hi: "नहीं, धन्यवाद", mr: "नको, धन्यवाद" };
 
 // Other parts of the page can open the assistant: window.dispatchEvent(new Event("leadops:open-chat"))
 export const openChat = () => window.dispatchEvent(new Event("leadops:open-chat"));
@@ -84,6 +86,9 @@ export default function ChatWidget() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
   const [language, setLanguage] = useState("en");
+  const [offer, setOffer] = useState(null); // an offer from the assistant, waiting for an answer
+  const openRef = useRef(false);
+  openRef.current = open;
   const historyLoaded = useRef(false);
   const listRef = useRef(null);
   const inputRef = useRef(null);
@@ -93,6 +98,36 @@ export default function ChatWidget() {
     window.addEventListener("leadops:open-chat", show);
     return () => window.removeEventListener("leadops:open-chat", show);
   }, []);
+
+  // The offer goes into the conversation, with the form that collects the visitor's number.
+  function showOfferInChat(nudge) {
+    const details =
+      nudge.kind === "site_visit"
+        ? { purpose: "site_visit", project: nudge.project, offer: true }
+        : { purpose: "offer", message: nudge.ask, cta: nudge.cta };
+    setLanguage(nudge.language);
+    setMessages((current) => [
+      ...current,
+      { role: "assistant", text: nudge.text, action: { type: "contact_form", listing_id: nudge.listing_id, need_contact: true, ...details } },
+    ]);
+  }
+
+  useEffect(() => {
+    onNudge((nudge) => {
+      track("nudge_shown", { nudge_id: nudge.id, kind: nudge.kind, listing_id: nudge.listing_id });
+      if (openRef.current) showOfferInChat(nudge);
+      else setOffer(nudge);
+    });
+  }, []);
+
+  function answerOffer(accepted) {
+    track(accepted ? "nudge_accepted" : "nudge_dismissed", { nudge_id: offer.id, kind: offer.kind, listing_id: offer.listing_id });
+    if (accepted) {
+      showOfferInChat(offer);
+      setOpen(true);
+    }
+    setOffer(null);
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -147,14 +182,40 @@ export default function ChatWidget() {
 
   if (!open) {
     return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="fixed bottom-4 right-4 z-40 flex items-center gap-2 rounded-full bg-marigold px-5 py-3 font-semibold text-ink shadow-lg shadow-ink/15 hover:bg-[#e09500]"
-      >
-        <IconChat className="size-5" />
-        Ask about homes
-      </button>
+      <>
+        {offer && (
+          <aside
+            aria-label="An offer from the property assistant"
+            className="fixed bottom-20 right-4 z-40 w-[min(340px,calc(100vw-2rem))] rounded-xl border border-line bg-white p-4 shadow-2xl shadow-ink/20"
+          >
+            <p className="flex items-center gap-1.5 text-xs font-semibold text-blueprint">
+              <IconChat className="size-4" />
+              Property assistant
+            </p>
+            <p className="mt-2 text-sm text-ink">{offer.text}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => answerOffer(true)}
+                className="rounded-md bg-marigold px-3 py-2 text-sm font-semibold text-ink hover:bg-[#e09500]"
+              >
+                {offer.cta}
+              </button>
+              <button type="button" onClick={() => answerOffer(false)} className="rounded-md border border-line px-3 py-2 text-sm hover:bg-concrete">
+                {NO_THANKS[offer.language] ?? NO_THANKS.en}
+              </button>
+            </div>
+          </aside>
+        )}
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="fixed bottom-4 right-4 z-40 flex items-center gap-2 rounded-full bg-marigold px-5 py-3 font-semibold text-ink shadow-lg shadow-ink/15 hover:bg-[#e09500]"
+        >
+          <IconChat className="size-5" />
+          Ask about homes
+        </button>
+      </>
     );
   }
 

@@ -5,8 +5,9 @@ from typing import Literal
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from fastapi.concurrency import run_in_threadpool
 
-from ..schemas import RescoreOut, StatsOut, VisitorDetailOut, VisitorOut
+from ..schemas import NudgeOut, RescoreOut, StatsOut, VisitorDetailOut, VisitorOut
 from ..scoring.engine import broadcast_snapshot, rescore_all
+from ..scoring.nudge import OfferRefused, queue_offer
 from ..tracking import dashboard_stats, list_visitors, visitor_detail
 
 router = APIRouter(tags=["visitors"])
@@ -37,6 +38,15 @@ def get_visitor(visitor_id: str) -> VisitorDetailOut:
     if detail is None:
         raise HTTPException(status_code=404, detail="Visitor not found")
     return detail
+
+
+@router.post("/visitors/{visitor_id}/nudge", response_model=NudgeOut, status_code=201)
+def send_offer(visitor_id: str) -> NudgeOut:
+    """"Send an offer now": the assistant makes this visitor an offer with their next event batch."""
+    try:
+        return queue_offer(visitor_id)
+    except OfferRefused as refused:
+        raise HTTPException(status_code=refused.status, detail=refused.detail) from None
 
 
 async def _rescore_and_refresh() -> None:

@@ -6,6 +6,7 @@ from pydantic import ValidationError
 
 from ..schemas import EventBatchIn, EventsAccepted
 from ..scoring.engine import publish, score_safely
+from ..scoring.nudge import next_offer
 from ..tracking import store_event_batch
 from ..utils import client_ip
 
@@ -14,9 +15,10 @@ router = APIRouter(tags=["events"])
 MAX_BATCH_BYTES = 256 * 1024
 
 
-@router.post("/events", response_model=EventsAccepted)
+@router.post("/events", response_model=EventsAccepted, response_model_exclude_none=True)
 async def ingest_events(request: Request) -> EventsAccepted:
-    """Store a batch of events. The body is an EventBatchIn as JSON (see docs/CONTRACTS.md).
+    """Store a batch of events. The body is an EventBatchIn as JSON (see docs/CONTRACTS.md). When the assistant has an
+    offer for this visitor, it comes back in the response as `nudge`.
 
     The SDK sends the JSON as text/plain, so browsers skip the CORS preflight and navigator.sendBeacon works
     when the page closes. That's why the body is parsed here rather than by FastAPI.
@@ -35,4 +37,5 @@ async def ingest_events(request: Request) -> EventsAccepted:
     visitor = await run_in_threadpool(store_event_batch, batch, client_ip(request), request.headers.get("user-agent"))
     update = await run_in_threadpool(score_safely, batch.visitor_id)  # rules + model: a few milliseconds
     await publish(visitor, update)
-    return EventsAccepted(accepted=len(batch.events))
+    offer = await run_in_threadpool(next_offer, batch)
+    return EventsAccepted(accepted=len(batch.events), nudge=offer)

@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from .db import SessionLocal
 from .listings import get_listing
-from .models import ChatMessage, Event, Lead, SiteVisit, Visitor, VisitSession
+from .models import ChatMessage, Event, Lead, Nudge, SiteVisit, Visitor, VisitSession
 from .schemas import (
     ChatMessageOut,
     EventBatchIn,
@@ -21,6 +21,7 @@ from .schemas import (
     LeadCheckOut,
     LeadIn,
     LeadOut,
+    NudgeRecordOut,
     ScoreOut,
     SessionOut,
     StatsOut,
@@ -230,6 +231,9 @@ def visitor_detail(visitor_id: str) -> VisitorDetailOut | None:
             leads=[lead_out(row, visitor.label) for row in leads],
             chat=[ChatMessageOut.model_validate(row) for row in chat],
             site_visits=_visits_of(db, visitor_id),
+            nudges=[NudgeRecordOut.model_validate(row) for row in db.scalars(
+                select(Nudge).where(Nudge.visitor_id == visitor_id).order_by(Nudge.created_at.desc())
+            )],  # fmt: skip
             score_detail=(visitor.score or {}).get("detail"),
         )
 
@@ -310,7 +314,7 @@ def request_visit(payload: VisitIn, ip: str | None, user_agent: str | None) -> t
         details = LeadIn(
             visitor_id=payload.visitor_id, session_id=payload.session_id, listing_id=home.id, name=payload.name.strip(),
             phone=payload.phone.strip(), email=payload.email, message=f"Asked for a site visit to {home.project}", consent=True,
-            honeypot=payload.honeypot, form_fill_ms=payload.form_fill_ms, client_ts=int(time.time() * 1000), source="chat",
+            honeypot=payload.honeypot, form_fill_ms=payload.form_fill_ms, client_ts=int(time.time() * 1000), source=payload.lead_source,
         )  # fmt: skip
         new_lead, _ = store_lead(details, ip, user_agent)
         visitor_id, lead_id = new_lead.visitor_id, new_lead.id
@@ -350,6 +354,9 @@ def dashboard_stats(active_minutes: int = 2) -> StatsOut:
                     select(Visitor.label, func.count()).where(Visitor.label.is_not(None)).group_by(Visitor.label)
                 ).all()
             ),
+            assistant_leads=db.scalar(select(func.count()).select_from(Lead).where(Lead.source == "assistant_offer")) or 0,
+            offers_sent=db.scalar(select(func.count()).select_from(Nudge).where(Nudge.status != "pending")) or 0,
+            offers_accepted=db.scalar(select(func.count()).select_from(Nudge).where(Nudge.status == "accepted")) or 0,
         )
 
 

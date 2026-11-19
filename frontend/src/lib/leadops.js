@@ -19,6 +19,12 @@ export function track(name, props = {}) {
   else (window.__leadopsQueue ||= []).push(["track", name, props]);
 }
 
+// Offers from the assistant for serious anonymous visitors (the smart engagement trigger).
+export function onNudge(handler) {
+  if (window.LeadOps) window.LeadOps.onNudge(handler);
+  else (window.__leadopsQueue ||= []).push(["onNudge", handler]);
+}
+
 // The anonymous visitor and session IDs, sent with enquiries and chat so the backend can link them.
 export function visitorIds() {
   return window.LeadOps ? window.LeadOps.ids() : { visitor_id: null, session_id: null };

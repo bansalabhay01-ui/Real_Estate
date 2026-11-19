@@ -47,6 +47,7 @@ export function getVisitors({ label, sort = "recent", limit = 200 } = {}) {
 }
 
 export const getStats = () => request("/stats");
+export const sendOffer = (visitorId) => request(`/visitors/${encodeURIComponent(visitorId)}/nudge`, { method: "POST" });
 
 // The live demo tools on the dashboard.
 export const getDemoStatus = () => request("/demo/status");

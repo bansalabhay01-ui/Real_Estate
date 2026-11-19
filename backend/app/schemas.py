@@ -110,9 +110,23 @@ class EventBatchIn(BaseModel):
     events: list[EventIn] = Field(min_length=1, max_length=100)
 
 
+class NudgeOut(BaseModel):
+    """An offer from the assistant, sent back with an event batch. The SDK hands it to the website (LeadOps.onNudge)."""
+
+    id: str
+    kind: str  # floor_plan / emi_plan / site_visit / shortlist
+    text: str  # the offer, in the visitor's language
+    cta: str  # the words on the accept button
+    listing_id: str | None = None
+    project: str | None = None
+    language: str = "en"
+    ask: str = ""  # what accepting means, in words for the sales team: send it as the enquiry's message
+
+
 class EventsAccepted(BaseModel):
     ok: bool = True
     accepted: int
+    nudge: NudgeOut | None = None  # only when the assistant has an offer for this visitor
 
 
 # ---------------------------------------------------------------- visitors (dashboard)
@@ -159,6 +173,9 @@ class StatsOut(BaseModel):
     leads: int
     chatting_visitors: int  # visitors who talked to the assistant
     labels: dict[str, int] = {}  # visitors per label, e.g. {"Hot": 4, "Bot": 120}
+    assistant_leads: int = 0  # enquiries that came from an offer by the assistant
+    offers_sent: int = 0  # offers that reached a visitor's browser
+    offers_accepted: int = 0
 
 
 class RescoreOut(BaseModel):
@@ -268,6 +285,7 @@ class VisitIn(BaseModel):
     day: date
     slot: Literal["morning", "afternoon", "evening"] = "morning"
     source: Literal["assistant", "dashboard"] = "assistant"
+    lead_source: Literal["chat", "assistant_offer"] = "chat"  # where new contact details came from
     language: Annotated[str | None, _clip(10)] = None  # the language of the confirmation message
     name: Annotated[str | None, _clip(100)] = None
     phone: Annotated[str | None, _clip(32)] = None
@@ -361,6 +379,19 @@ class ChatMessageOut(BaseModel):
     created_at: UTCDateTime
 
 
+class NudgeRecordOut(BaseModel):
+    """An offer made to this visitor, on their dashboard panel."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    kind: str
+    text: str
+    trigger: str  # auto / sales
+    status: str  # pending / sent / shown / accepted / dismissed
+    created_at: UTCDateTime
+
+
 class VisitorDetailOut(BaseModel):
     visitor: VisitorOut
     user_agent: str | None
@@ -370,6 +401,7 @@ class VisitorDetailOut(BaseModel):
     leads: list[LeadOut]  # newest first
     chat: list[ChatMessageOut]  # oldest first
     site_visits: list[VisitOut] = []  # newest first
+    nudges: list[NudgeRecordOut] = []  # offers from the assistant, newest first
     score_detail: dict[str, Any] | None = None  # rules that fired, SHAP factors, intent points (docs/CONTRACTS.md)
 
 

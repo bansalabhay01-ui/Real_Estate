@@ -8,6 +8,8 @@ export const HINT_LABELS = {
   no_user_agent: "No user agent",
 };
 
+export const OFFER_NAMES = { floor_plan: "floor plan on WhatsApp", emi_plan: "EMI plan on WhatsApp", site_visit: "a site visit", shortlist: "a shortlist of homes" };
+
 // One line per event for the visitor timeline.
 export function describeEvent(event) {
   const p = event.props ?? {};
@@ -36,6 +38,12 @@ export function describeEvent(event) {
       return "Opened the assistant";
     case "chat_message":
       return "Wrote to the assistant";
+    case "nudge_shown":
+      return `The assistant made an offer (${OFFER_NAMES[p.kind] ?? "an offer"})`;
+    case "nudge_accepted":
+      return `Accepted the assistant's offer (${OFFER_NAMES[p.kind] ?? "an offer"})`;
+    case "nudge_dismissed":
+      return "Said no to the assistant's offer";
     case "filter_used": {
       const parts = [p.city, p.bhk && `${p.bhk} BHK`, p.max_price && `under ${formatPrice(p.max_price)}`].filter(Boolean);
       return parts.length ? `Filtered homes: ${parts.join(", ")}` : "Cleared the filters";

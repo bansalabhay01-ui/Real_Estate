@@ -144,6 +144,25 @@ class SiteVisit(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
+class Nudge(Base):
+    """An offer from the assistant to an anonymous visitor (the smart engagement trigger), and what became of it."""
+
+    __tablename__ = "nudges"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    visitor_id: Mapped[str] = mapped_column(ForeignKey("visitors.id"), index=True)
+    session_id: Mapped[str | None] = mapped_column(String(64), index=True)
+    kind: Mapped[str] = mapped_column(String(20))  # floor_plan / emi_plan / site_visit / shortlist
+    listing_id: Mapped[str | None] = mapped_column(String(32))
+    language: Mapped[str] = mapped_column(String(10), default="en")
+    text: Mapped[str] = mapped_column(Text)
+    cta: Mapped[str] = mapped_column(String(80))
+    trigger: Mapped[str] = mapped_column(String(10), default="auto")  # auto, or sales when a salesperson sent it
+    status: Mapped[str] = mapped_column(String(12), default="sent")  # pending / sent / shown / accepted / dismissed
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
 class ChatMessage(Base):
     """One message in a conversation with the property assistant."""
 

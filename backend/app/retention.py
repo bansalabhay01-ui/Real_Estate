@@ -3,7 +3,7 @@
 from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
-from .models import ChatMessage, Event, Feedback, Lead, Score, SiteVisit, Visitor, VisitSession
+from .models import ChatMessage, Event, Feedback, Lead, Nudge, Score, SiteVisit, Visitor, VisitSession
 
 _CHUNK = 500  # databases limit how many values one IN (...) may hold
 
@@ -13,7 +13,7 @@ def erase_visitors(db: Session, visitor_ids: list[str]) -> int:
     removed = 0
     for start in range(0, len(visitor_ids), _CHUNK):
         chunk = visitor_ids[start : start + _CHUNK]
-        for table in (Feedback, Score, SiteVisit, ChatMessage, Event, Lead, VisitSession):
+        for table in (Feedback, Score, SiteVisit, Nudge, ChatMessage, Event, Lead, VisitSession):
             db.execute(delete(table).where(table.visitor_id.in_(chunk)))
         removed += db.execute(delete(Visitor).where(Visitor.id.in_(chunk))).rowcount
     db.commit()

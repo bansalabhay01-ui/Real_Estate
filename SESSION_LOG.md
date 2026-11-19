@@ -5,9 +5,9 @@ A short diary of LeadOps work sessions, newest first. Claude saves each session 
 ## Current status
 _Last updated: 2026-11-18_
 
-- **Phase:** Week 3 (Integration + Wow) in progress: Parts 1-2 of 6 done. Deadline about 30 Nov 2026.
-- **Done:** the Week 1 foundation (demo property site, tracking SDK, FastAPI backend, a basic property assistant in English, Hinglish and Hindi, the live sales dashboard, the traffic simulator, the shared contracts draft), all of Week 2 ("Week 2 Build Plan" in `LEADOPS_PLAN.md`: tester links, simulator v2, features and rules, the LightGBM human check with SHAP, intent points, labels and reasons, dashboard v1, three real Playwright bots, LLM extraction and visitor type) and Week 3 Parts 1-2: the dashboard's Simulate traffic button with a live scoreboard and Run a real bot; the assistant as a LangGraph agent with brochure answers, EMIs, site visits and Marathi. 160 tests pass.
-- **Next:** Week 3 Part 3: the smart engagement trigger. Classmates can start test sessions now (README, "Collecting real test sessions"); the real test set has no human sessions yet.
+- **Phase:** Week 3 (Integration + Wow) in progress: Parts 1-3 of 6 done. Deadline about 30 Nov 2026.
+- **Done:** the Week 1 foundation (demo property site, tracking SDK, FastAPI backend, a basic property assistant in English, Hinglish and Hindi, the live sales dashboard, the traffic simulator, the shared contracts draft), all of Week 2 ("Week 2 Build Plan" in `LEADOPS_PLAN.md`: tester links, simulator v2, features and rules, the LightGBM human check with SHAP, intent points, labels and reasons, dashboard v1, three real Playwright bots, LLM extraction and visitor type) and Week 3 Parts 1-3: the dashboard's Simulate traffic button with a live scoreboard and Run a real bot; the assistant as a LangGraph agent with brochure answers, EMIs, site visits and Marathi; the smart engagement trigger that turns serious anonymous visitors into leads. 175 tests pass.
+- **Next:** Week 3 Part 4: the lead brief, follow-up drafts and sales verdicts. Classmates can start test sessions now (README, "Collecting real test sessions"); the real test set has no human sessions yet.
 - **Blocked:** the LLM features haven't been tried with a real API key (the user hasn't approved spending it); template mode and the keyword rules work, and Claude's request shape matches the API reference.
 - **Code:** https://github.com/bansalabhay01-ui/Real_Estate (branch `main`)
 
@@ -28,9 +28,14 @@ _Last updated: 2026-11-18_
   - Site visits: the `site_visits` table, `POST / GET / PATCH /visits` (`backend/app/api/visits.py`), 15 intent points, `visit_booked` and `visit_updated` on the WebSocket, and a Site visits panel on the dashboard. Contact details are collected in a form in the chat (`frontend/src/components/ContactCapture.jsx`), never as chat text. `Lead.source` records where an enquiry came from.
   - Languages: Marathi joins English, Hinglish and Hindi in detection, patterns (including Devanagari digits), replies and the form. A short reply keeps the conversation's language.
   - Checked: 160 tests pass (with fake LLMs for the LLM paths) and the frontend builds. A headless Edge check passed 13/13: a payment-plan answer from the brochure, an EMI with 30% down, a Saturday-morning visit booked through the form, a Marathi reply, the visit confirmed from the dashboard with its intent points, no sideways scroll at phone width, no page errors.
+- **Part 3, smart engagement trigger:**
+  - `backend/app/scoring/nudge.py` decides after each event batch: looks human (0.8+), intent 40+, no contact details, not chatting, at least a minute on this visit, on a property page; once per visit and twice a day at most. The offer (floor plan, EMI plan, site visit or shortlist) comes from templates in the visitor's language. A new `nudges` table keeps each offer and what became of it.
+  - It travels back in the `/events` response as `nudge`. SDK 1.2 hands it to `LeadOps.onNudge(fn)`. The demo site shows an offer card above the assistant button; accepting opens the assistant with the contact form and sends an enquiry with `source: "assistant_offer"`.
+  - Dashboard: a "Found by the assistant" tile and alert, offers in the visitor's timeline, and **Send an offer now** for anonymous Warm or Hot visitors (`POST /visitors/{id}/nudge`).
+  - Checked: 175 tests pass and the frontend builds. A headless Edge check passed 12/12: the offer appeared for a serious anonymous visitor, accepting it created a lead marked as found by the assistant, a hand-sent offer arrived with the next batch, no sideways scroll at phone width, no page errors. The check found one bug, now fixed: the visitor panel didn't refresh after sending an offer.
 
 **Next**
-- Week 3 Part 3: the smart engagement trigger.
+- Week 3 Part 4: the lead brief, follow-up drafts and sales verdicts.
 
 **Notes**
 - Teammates: run `pip install -r requirements.txt` in `backend/` again for `langgraph`.

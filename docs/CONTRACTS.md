@@ -48,6 +48,18 @@ page closes). Up to 100 events per batch, 256 KB at most.
 
 Response: `{"ok": true, "accepted": 1}`. A bad batch gets `422` with the validation errors.
 
+When the assistant has an offer for this visitor (the smart engagement trigger), the response also has `nudge`:
+
+```json
+{"ok": true, "accepted": 12, "nudge": {"id": "9f2c41d07ab34e11", "kind": "floor_plan", "listing_id": "PUN-002",
+  "project": "Aranya Courtyard", "language": "en", "text": "Want the 3 BHK floor plan of Aranya Courtyard on WhatsApp?",
+  "cta": "Send it to me", "ask": "Asked for the 3 BHK floor plan of Aranya Courtyard on WhatsApp"}}
+```
+
+`kind` is `floor_plan`, `emi_plan`, `site_visit` or `shortlist`. SDK 1.2 hands it to the site's `LeadOps.onNudge(fn)`
+handler; a site without a handler shows nothing. The site reports what happened with the events below and sends an
+accepted offer as an enquiry with `source: "assistant_offer"` and `ask` as its message.
+
 - **visitor_id**: kept in `localStorage`, so it links repeat visits from the same browser.
 - **session_id**: a new one after 30 minutes without activity.
 - **context.webdriver**: `true` when Selenium, Playwright or Puppeteer drives the browser.
@@ -73,6 +85,7 @@ Response: `{"ok": true, "accepted": 1}`. A bad batch gets `422` with the validat
 | `filter_used` | the home-page filters settle after a change | `city`, `bhk`, `max_price` |
 | `enquiry_submitted` | the enquiry form is sent | `listing_id` |
 | `chat_opened` / `chat_message` | the assistant is opened / sent a message | `listing_id`, `length` |
+| `nudge_shown` / `nudge_accepted` / `nudge_dismissed` | the visitor saw / accepted / turned down an offer | `nudge_id`, `kind`, `listing_id` |
 
 Custom events from any site: `LeadOps.track("name", {...})`. Names are lower-cased and spaces become `_`.
 
@@ -147,8 +160,9 @@ is outside the next 60 days, `404` for an unknown home.
 |---|---|---|
 | `POST /events` | SDK event batches | B |
 | `GET /visitors?limit=&offset=&label=&sort=` | visitors, most recent activity first; `label=Hot` filters, `sort=intent` puts the highest intent first | B |
-| `GET /visitors/{id}` | one visitor: sessions, events (newest first, up to 200), enquiries, chat, `score_detail` | B |
-| `GET /stats` | `{visitors, active_now, leads, chatting_visitors, labels}` for the dashboard; `labels` counts visitors per label, e.g. `{"Hot": 4, "Bot": 120}` | B |
+| `GET /visitors/{id}` | one visitor: sessions, events (newest first, up to 200), enquiries, chat, site visits, offers (`nudges`), `score_detail` | B |
+| `POST /visitors/{id}/nudge` | "Send an offer now": queue an offer that reaches the browser with the visitor's next event batch. `201` with the offer; `409` if they already shared contact details or are labelled Bot or Junk | B |
+| `GET /stats` | `{visitors, active_now, leads, chatting_visitors, labels, assistant_leads, offers_sent, offers_accepted}` for the dashboard; `labels` counts visitors per label, e.g. `{"Hot": 4, "Bot": 120}` | B |
 | `POST /scoring/rescore` | reload the model (after `ml/train.py`) and relabel every visitor in the background: `{"ok": true, "visitors": 512}` | B |
 | `GET /listings?city=&bhk=&min_price=&max_price=&q=` | listings | B |
 | `GET /listings/{id}` | one listing | B |

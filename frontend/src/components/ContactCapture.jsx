@@ -125,6 +125,7 @@ export default function ContactCapture({ action, language = "en", onDone }) {
           day: fields.day,
           slot: fields.slot,
           language,
+          ...(action.offer ? { lead_source: "assistant_offer" } : {}),
           ...(action.need_contact ? contact : {}),
         });
         onDone(visit.confirmation);

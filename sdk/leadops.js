@@ -12,6 +12,7 @@
  *   LeadOps.track("emi_used", { emi: 52000 })  record a custom event
  *   LeadOps.ids()                                { visitor_id, session_id } for your own API calls
  *   LeadOps.flush()                              send queued events now
+ *   LeadOps.onNudge(function (offer) { ... })    show the assistant's offers to serious anonymous visitors
  *
  * Test sessions (for measuring LeadOps on real people and real bots):
  *   open any page with ?lo_test=genuine (or junk / bot) and optionally &lo_tester=t01. The browser remembers it
@@ -24,7 +25,7 @@
   "use strict";
   if (window.LeadOps && window.LeadOps.version) return; // already loaded on this page
 
-  var VERSION = "1.1.0";
+  var VERSION = "1.2.0";
   var SESSION_TIMEOUT_MS = 30 * 60 * 1000; // a new visit starts after 30 minutes without activity
   var FLUSH_INTERVAL_MS = 5000;
   var ACTIVITY_INTERVAL_MS = 10000;
@@ -178,6 +179,25 @@
     }, delayMs);
   }
 
+  // ---------------------------------------------------------------- offers from the assistant (smart engagement)
+
+  var nudgeHandler = null;
+  var waitingNudges = [];
+
+  function deliverNudge(nudge) {
+    if (nudgeHandler) {
+      try { nudgeHandler(nudge); } catch (e) { /* a site's handler must never break tracking */ }
+    } else {
+      waitingNudges.push(nudge);
+    }
+  }
+
+  function onNudge(handler) {
+    if (typeof handler !== "function") return;
+    nudgeHandler = handler;
+    waitingNudges.splice(0, waitingNudges.length).forEach(deliverNudge);
+  }
+
   function flush(pageClosing) {
     if (!queue.length) return;
     var body = JSON.stringify({
@@ -202,6 +222,10 @@
         headers: { "Content-Type": "text/plain" },
         credentials: "omit",
         keepalive: body.length < 60000
+      }).then(function (response) {
+        return response.ok ? response.json() : null;
+      }).then(function (answer) {
+        if (answer && answer.nudge) deliverNudge(answer.nudge);
       }).catch(function () { /* offline or API down: drop the batch quietly */ });
     } catch (e) { /* no fetch */ }
   }
@@ -359,12 +383,18 @@
     version: VERSION,
     track: track,
     ids: function () { return { visitor_id: visitorId, session_id: touchSession() }; },
-    flush: function () { flushActivity(); flush(false); }
+    flush: function () { flushActivity(); flush(false); },
+    onNudge: onNudge
   };
 
   // Calls a site made before this script finished loading: window.__leadopsQueue.push(["track", name, props])
   var early = window.__leadopsQueue;
-  window.__leadopsQueue = { push: function (call) { if (call && call[0] === "track") track(call[1], call[2]); } };
+  window.__leadopsQueue = {
+    push: function (call) {
+      if (call && call[0] === "track") track(call[1], call[2]);
+      if (call && call[0] === "onNudge") onNudge(call[1]);
+    }
+  };
   if (early && early.length) early.forEach(window.__leadopsQueue.push);
 
   setInterval(flushActivity, ACTIVITY_INTERVAL_MS);
