@@ -69,6 +69,8 @@ export function IntentMeter({ value }) {
   );
 }
 
+const VERDICT_NAMES = { genuine: "Genuine", fake: "Fake", converted: "Converted" };
+
 export function SignalChips({ visitor }) {
   const chips = visitor.automation_hints.map((hint) => ({ key: hint, tone: "alert", text: HINT_LABELS[hint] ?? hint }));
   if (visitor.lead_count > 0 && visitor.page_views === 0) {
@@ -80,6 +82,7 @@ export function SignalChips({ visitor }) {
   if (visitor.chat_count > 0) chips.push({ key: "chat", tone: "blue", text: "Chatted" });
   if (visitor.test_label) chips.push({ key: "test", tone: "test", text: `Test: ${visitor.test_label}` });
   if (visitor.id.startsWith("sim-")) chips.push({ key: "simulated", tone: "test", text: "Simulated" });
+  if (visitor.feedback) chips.push({ key: "verdict", tone: "blue", text: `Sales: ${VERDICT_NAMES[visitor.feedback.label] ?? visitor.feedback.label}` });
 
   if (chips.length === 0) return <span className="text-muted">None yet</span>;
   return (

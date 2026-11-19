@@ -145,6 +145,14 @@ class ScoreOut(BaseModel):
     scored_at: str  # ISO 8601 UTC
 
 
+class VerdictOut(BaseModel):
+    """The sales team's latest verdict on a visitor."""
+
+    label: str  # genuine / fake / converted
+    note: str | None = None
+    created_at: UTCDateTime | None = None
+
+
 class VisitorOut(BaseModel):
     id: str
     site: str | None
@@ -163,6 +171,38 @@ class VisitorOut(BaseModel):
     label: str | None = None  # Bot / Junk / Review / Cold / Warm / Hot, set by the scoring engine
     test_label: str | None = None  # genuine / junk / bot on test sessions from a tester link
     score: ScoreOut | None = None  # None until the visitor has been scored
+    feedback: VerdictOut | None = None  # the sales team's latest verdict
+
+
+class NextStepOut(BaseModel):
+    text: str  # "Call now: asked for a site visit this Saturday."
+    urgency: Literal["now", "today", "this_week", "none"]
+    action: Literal["call", "offer", "whatsapp", "review", "confirm_visit", "none"]
+
+
+class BriefOut(BaseModel):
+    """What a salesperson needs at a glance."""
+
+    lines: list[str]  # three plain lines: what they want, what they did, what to watch for
+    next_step: NextStepOut
+    mode: Literal["llm", "template"]
+
+
+class FollowUpIn(BaseModel):
+    channel: Literal["whatsapp", "email"] = "whatsapp"
+    language: Literal["auto", "en", "hinglish", "hi", "mr"] = "auto"  # auto: the language the buyer has been using
+
+
+class FollowUpOut(BaseModel):
+    channel: str
+    language: str
+    subject: str  # for email
+    text: str
+    mode: Literal["llm", "template"]
+    whatsapp_number: str | None = None  # country code and digits
+    whatsapp_url: str | None = None  # a wa.me click-to-chat link with the text filled in
+    email: str | None = None
+    mailto_url: str | None = None
 
 
 class StatsOut(BaseModel):
@@ -271,6 +311,7 @@ class LeadOut(BaseModel):
     label: str | None = None  # the visitor's current label
     checks: list[LeadCheckOut] = []
     source: str | None = "form"  # form / assistant_offer / chat
+    verdict: str | None = None  # the sales team's latest verdict on this visitor
 
 
 # ---------------------------------------------------------------- site visits -> POST /visits

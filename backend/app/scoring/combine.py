@@ -22,6 +22,7 @@ from .model import HumanCheck, HumanModel, current_model
 from .rules import BOT, CERTAIN, JUNK, STRONG, Signal, evaluate
 
 NOT_BUYERS = {"broker", "spam", "tenant"}  # visitor types that aren't buyers (Part 6 classifies them)
+HUMAN_VERDICTS = {"genuine", "converted"}  # a salesperson who has spoken to the buyer overrules the rules and the model
 CONFIDENT = 0.7
 
 
@@ -153,7 +154,11 @@ def intent_points(record: dict, f: dict, signals: list[Signal]) -> list[IntentPo
 
 
 def decide(f: dict, signals: list[Signal], human: HumanCheck, intent: int, thresholds: dict,
-           visitor_type: dict | None = None) -> str:
+           visitor_type: dict | None = None, verdict: str | None = None) -> str:
+    if verdict == "fake":
+        return "Junk"
+    if verdict in HUMAN_VERDICTS:
+        return "Hot" if intent > 70 else "Warm" if intent >= 40 else "Cold"
     p = human.human_prob
     bot_certain = [s for s in signals if s.layer == BOT and s.strength == CERTAIN]
     bot_strong = [s for s in signals if s.layer == BOT and s.strength == STRONG]
@@ -174,17 +179,19 @@ def decide(f: dict, signals: list[Signal], human: HumanCheck, intent: int, thres
     return "Hot" if intent > 70 else "Warm" if intent >= 40 else "Cold"
 
 
-def score_record(record: dict, *, model: HumanModel | None = None, visitor_type: dict | None = None) -> ScoreResult:
-    """Score one visitor record (features.py). model: the saved model by default, or one being trained."""
+def score_record(record: dict, *, model: HumanModel | None = None, visitor_type: dict | None = None,
+                 verdict: str | None = None) -> ScoreResult:
+    """Score one visitor record (features.py). model: the saved model by default, or one being trained.
+    verdict: the sales team's latest word on this visitor (genuine / fake / converted), which overrules the engine."""
     model = model or current_model()
     f = visitor_features(record)
     signals = evaluate(record, f)
     human = model.predict(f)
     points = intent_points(record, f, signals)
     intent = min(100, sum(point.points for point in points))
-    label = decide(f, signals, human, intent, model.thresholds, visitor_type)
+    label = decide(f, signals, human, intent, model.thresholds, visitor_type, verdict)
     reasons = reasons_for(label, signals=signals, check=human, features=f, points=points, intent=intent,
-                          visitor_type=visitor_type)
+                          visitor_type=visitor_type, verdict=verdict)
     return ScoreResult(label=label, intent_score=intent, human=human, signals=signals, points=points, reasons=reasons,
                        summary=summary_line(label, reasons), thresholds=dict(model.thresholds), features=f,
                        visitor_type=visitor_type)

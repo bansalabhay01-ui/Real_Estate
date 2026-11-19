@@ -44,6 +44,11 @@ class Visitor(Base):
     scored_at: Mapped[datetime | None] = mapped_column(DateTime)
     # end_buyer / investor / tenant / broker / spam from the visitor's messages: {type, confidence, reason, source}
     visitor_type: Mapped[dict | None] = mapped_column(JSON)
+    # The sales team's latest verdict (every verdict is also kept in the feedback table).
+    feedback_label: Mapped[str | None] = mapped_column(String(20))  # genuine / fake / converted
+    feedback_note: Mapped[str | None] = mapped_column(Text)
+    feedback_at: Mapped[datetime | None] = mapped_column(DateTime)
+    brief: Mapped[dict | None] = mapped_column(JSON)  # the LLM-written brief, kept until the visitor's score changes
 
     sessions: Mapped[list["VisitSession"]] = relationship(back_populates="visitor")
 

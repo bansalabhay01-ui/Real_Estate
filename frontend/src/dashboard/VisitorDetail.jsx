@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { IconClose } from "../components/icons";
-import { getVisitor, sendOffer } from "../lib/api";
+import { getVisitor } from "../lib/api";
 import { formatClock, formatDateTime, formatPrice } from "../lib/format";
-import { describeEvent, OFFER_NAMES } from "./describe";
+import { describeEvent } from "./describe";
+import LeadBrief, { VerdictButtons } from "./LeadBrief";
 import ScoreBreakdown from "./ScoreBreakdown";
 import { LabelBadge, LeadChecks, shortId, SignalChips } from "./Signals";
 
@@ -52,49 +53,6 @@ function BuyerDetails({ profile }) {
   );
 }
 
-const OFFER_STATUS = { pending: "waiting for their next page activity", sent: "sent", shown: "shown", accepted: "accepted", dismissed: "turned down" };
-
-// Anonymous Warm or Hot visitors can be sent the assistant's offer by hand.
-function OfferControl({ visitor, nudges, onSent }) {
-  const [state, setState] = useState("idle"); // idle | sending | failed
-  const latest = nudges[0];
-  const canSend = visitor.lead_count === 0 && ["Warm", "Hot"].includes(visitor.label) && latest?.status !== "pending";
-  if (!canSend && !latest) return null;
-  return (
-    <Section title="Assistant's offer">
-      {latest && (
-        <p className="text-sm">
-          {OFFER_NAMES[latest.kind] ?? "An offer"}: <span className="text-muted">{OFFER_STATUS[latest.status] ?? latest.status}</span>
-        </p>
-      )}
-      {canSend && (
-        <button
-          type="button"
-          disabled={state === "sending"}
-          onClick={() => {
-            setState("sending");
-            sendOffer(visitor.id).then(
-              () => {
-                setState("idle");
-                onSent();
-              },
-              () => setState("failed"),
-            );
-          }}
-          className="mt-2 rounded-md border border-ink px-3 py-1.5 text-sm font-semibold hover:bg-ink hover:text-white disabled:opacity-60"
-        >
-          {state === "sending" ? "Sending..." : "Send an offer now"}
-        </button>
-      )}
-      {state === "failed" && (
-        <p role="alert" className="mt-1 text-sm text-alert">
-          The offer couldn&apos;t be sent. Try again.
-        </p>
-      )}
-    </Section>
-  );
-}
-
 const panelClass = "self-start rounded-lg border border-line bg-white p-5 xl:sticky xl:top-6";
 
 export default function VisitorDetail({ visitorId, version, onClose }) {
@@ -132,7 +90,8 @@ export default function VisitorDetail({ visitorId, version, onClose }) {
     return <aside className={`${panelClass} text-sm text-muted`}>Loading the visitor...</aside>;
   }
 
-  const { visitor, events, leads, chat, site_visits: visits = [], nudges = [], context, user_agent: userAgent, score_detail: scoreDetail } = detail;
+  const { visitor, events, leads, chat, site_visits: visits = [], context, user_agent: userAgent, score_detail: scoreDetail } = detail;
+  const reload = () => setRefresh((count) => count + 1);
   return (
     <aside
       aria-labelledby="visitor-heading"
@@ -153,11 +112,11 @@ export default function VisitorDetail({ visitorId, version, onClose }) {
         </button>
       </div>
 
+      <LeadBrief detail={detail} onChanged={reload} />
+
       <Section title="Why this label">
         <ScoreBreakdown score={visitor.score} detail={scoreDetail} hasEnquiry={leads.length > 0} />
       </Section>
-
-      <OfferControl visitor={visitor} nudges={nudges} onSent={() => setRefresh((count) => count + 1)} />
 
       <Section title="Signals">
         <SignalChips visitor={visitor} />
@@ -197,6 +156,11 @@ export default function VisitorDetail({ visitorId, version, onClose }) {
                 <div className="mt-2">
                   <LeadChecks lead={lead} />
                 </div>
+                {leads.length > 1 && (
+                  <div className="mt-2">
+                    <VerdictButtons visitorId={visitor.id} leadId={lead.id} current={lead.verdict} onSaved={reload} />
+                  </div>
+                )}
               </li>
             ))}
           </ul>

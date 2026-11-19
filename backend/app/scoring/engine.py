@@ -52,7 +52,7 @@ def score_visitor(visitor_id: str) -> ScoreUpdate | None:
         if record is None:
             return None
         visitor = db.get(Visitor, visitor_id)
-        result = score_record(record, visitor_type=known_type(visitor.visitor_type))
+        result = score_record(record, visitor_type=known_type(visitor.visitor_type), verdict=visitor.feedback_label)
         previous_label, previous_intent = visitor.label, visitor.intent_score
         now = utcnow()
         saved = result.as_json()

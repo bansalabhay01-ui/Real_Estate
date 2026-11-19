@@ -73,7 +73,10 @@ Open http://localhost:5173 for the demo site and http://localhost:5173/dashboard
    lead "found by the assistant". A salesperson can also press **Send an offer now** on an anonymous Warm or Hot visitor.
 5. Send an enquiry from a property page. The dashboard shows its label and its checks: phone, email, name, message,
    the hidden honeypot field and how fast the form was filled in.
-6. On the dashboard, press **Simulate traffic**: 200 bots, 30 junk leads and 20 real buyers arrive over about 30
+6. Click that visitor on the dashboard. The panel opens with a three-line brief and the next step. **Draft a follow-up**
+   writes a WhatsApp or email message in the buyer's language, ready to edit and open in WhatsApp. **Book a site visit**
+   takes one click, and **Genuine**, **Fake** and **Converted** relabel the visitor at once.
+7. On the dashboard, press **Simulate traffic**: 200 bots, 30 junk leads and 20 real buyers arrive over about 30
    seconds and are sorted live, ending with a scoreboard. **Run a real bot** opens a browser window and lets a
    Playwright bot attack the site. **Clear simulated visitors** gets the dashboard ready for the next rehearsal.
 

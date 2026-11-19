@@ -25,6 +25,7 @@ from .schemas import (
     ScoreOut,
     SessionOut,
     StatsOut,
+    VerdictOut,
     VisitIn,
     VisitOut,
     VisitorDetailOut,
@@ -62,11 +63,11 @@ def score_out(saved: dict | None) -> ScoreOut | None:
         return None
 
 
-def lead_out(lead: Lead, label: str | None = None) -> LeadOut:
+def lead_out(lead: Lead, label: str | None = None, verdict: str | None = None) -> LeadOut:
     fields = {"phone": lead.phone, "email": lead.email, "name": lead.name, "message": lead.message,
               "honeypot": lead.honeypot, "form_fill_ms": lead.form_fill_ms}
     checks = [LeadCheckOut(**check) for check in lead_checks(fields)]
-    return LeadOut.model_validate(lead).model_copy(update={"label": label, "checks": checks, "source": lead.source or "form"})
+    return LeadOut.model_validate(lead).model_copy(update={"label": label, "checks": checks, "source": lead.source or "form", "verdict": verdict})
 
 
 def visitor_out(visitor: Visitor) -> VisitorOut:
@@ -88,6 +89,7 @@ def visitor_out(visitor: Visitor) -> VisitorOut:
         label=visitor.label,
         test_label=(visitor.context or {}).get("test_label"),
         score=score_out(visitor.score),
+        feedback=VerdictOut(label=visitor.feedback_label, note=visitor.feedback_note, created_at=visitor.feedback_at) if visitor.feedback_label else None,
     )
 
 
@@ -191,7 +193,7 @@ def store_lead(payload: LeadIn, ip: str | None, user_agent: str | None) -> tuple
         visitor.last_seen = now
         visitor.last_ip = ip or visitor.last_ip
         db.commit()
-        return lead_out(lead, visitor.label), visitor_out(visitor)
+        return lead_out(lead, visitor.label, visitor.feedback_label), visitor_out(visitor)
 
     return run_in_session(work)
 
@@ -228,7 +230,7 @@ def visitor_detail(visitor_id: str) -> VisitorDetailOut | None:
             context=visitor.context or {},
             sessions=[SessionOut.model_validate(row) for row in sessions],
             events=[EventOut.model_validate(row) for row in events],
-            leads=[lead_out(row, visitor.label) for row in leads],
+            leads=[lead_out(row, visitor.label, visitor.feedback_label) for row in leads],
             chat=[ChatMessageOut.model_validate(row) for row in chat],
             site_visits=_visits_of(db, visitor_id),
             nudges=[NudgeRecordOut.model_validate(row) for row in db.scalars(
@@ -363,9 +365,10 @@ def dashboard_stats(active_minutes: int = 2) -> StatsOut:
 def list_leads(limit: int = 50, offset: int = 0) -> list[LeadOut]:
     with SessionLocal() as db:
         rows = db.execute(
-            select(Lead, Visitor.label).join(Visitor, Visitor.id == Lead.visitor_id).order_by(Lead.id.desc()).limit(limit).offset(offset)
-        ).all()
-        return [lead_out(lead, label) for lead, label in rows]
+            select(Lead, Visitor.label, Visitor.feedback_label).join(Visitor, Visitor.id == Lead.visitor_id)
+            .order_by(Lead.id.desc()).limit(limit).offset(offset)
+        ).all()  # fmt: skip
+        return [lead_out(lead, label, verdict) for lead, label, verdict in rows]
 
 
 def get_lead(lead_id: int) -> LeadOut | None:
@@ -373,4 +376,5 @@ def get_lead(lead_id: int) -> LeadOut | None:
         lead = db.get(Lead, lead_id)
         if lead is None:
             return None
-        return lead_out(lead, db.scalar(select(Visitor.label).where(Visitor.id == lead.visitor_id)))
+        visitor = db.get(Visitor, lead.visitor_id)
+        return lead_out(lead, visitor.label if visitor else None, visitor.feedback_label if visitor else None)

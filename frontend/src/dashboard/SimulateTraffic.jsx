@@ -64,7 +64,7 @@ function Scoreboard({ board }) {
       </div>
       <details className="text-sm">
         <summary className="cursor-pointer font-medium text-blueprint">How each kind of visitor was labelled</summary>
-        <div className="mt-2 overflow-x-auto">
+        <div className="relative mt-2 overflow-x-auto">
           <table className="w-full min-w-[520px] text-left">
             <thead className="border-b border-line text-muted">
               <tr>

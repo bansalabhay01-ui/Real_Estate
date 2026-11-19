@@ -64,7 +64,7 @@ function isoDay(day) {
 }
 
 // The next ten days, plus the day the visitor asked for if it is further away.
-function dayChoices(asked) {
+export function dayChoices(asked) {
   const days = Array.from({ length: 10 }, (_, index) => {
     const day = new Date();
     day.setDate(day.getDate() + index + 1);

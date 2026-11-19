@@ -192,3 +192,184 @@ def test_offers_by_hand_have_limits(client):
     body = {"visitor_id": known_id, "name": "Asha Rao", "phone": "96" + str(random.randint(10_000_000, 99_999_999)), "consent": True}
     client.post("/leads", json=body)
     assert client.post(f"/visitors/{known_id}/nudge").status_code == 409
+
+
+# ---------------------------------------------------------------- the lead brief and the next step
+
+from app.ai import brief as brief_module  # noqa: E402
+from app.ai.brief import next_step  # noqa: E402
+from app.ai.llm_client import LLMError  # noqa: E402
+
+
+def enquiring_visitor(client, *, name="Priya Kulkarni", email="priya.k@gmail.com", phone=None):
+    visitor_id, session_id = str(uuid.uuid4()), str(uuid.uuid4())
+    post(client, visitor_id, session_id, browsing(1_790_000_000_000, floor_plan=True))
+    number = phone or "98" + str(random.randint(10_000_000, 99_999_999))
+    body = {"visitor_id": visitor_id, "session_id": session_id, "listing_id": "PUN-002", "name": name, "phone": number, "email": email,
+            "consent": True, "form_fill_ms": 40_000, "message": "Please share the details."}  # fmt: skip
+    assert client.post("/leads", json=body).status_code == 201
+    return visitor_id, number
+
+
+@pytest.mark.parametrize(
+    ("label", "details", "action", "urgency"),
+    [
+        ("Hot", {"has_contact": True}, "call", "now"),
+        ("Hot", {"has_contact": False}, "offer", "now"),
+        ("Warm", {"has_contact": True}, "whatsapp", "today"),
+        ("Warm", {"has_contact": False}, "offer", "today"),
+        ("Cold", {"has_contact": True}, "whatsapp", "this_week"),
+        ("Cold", {"has_contact": False}, "none", "none"),
+        ("Review", {"has_contact": True}, "review", "today"),
+        ("Bot", {"has_contact": True}, "none", "none"),
+        ("Junk", {"has_contact": True}, "none", "none"),
+        ("Hot", {"has_contact": True, "visit": "Aranya Courtyard on Sat 21 Nov, morning"}, "confirm_visit", "now"),
+        ("Warm", {"has_contact": True, "call_requested": True}, "call", "now"),
+        ("Hot", {"has_contact": True, "verdict": "converted"}, "none", "none"),
+        ("Hot", {"has_contact": True, "verdict": "fake"}, "none", "none"),
+    ],
+)
+def test_the_next_step(label, details, action, urgency):
+    fields = {"verdict": None, "visit": None, "reason": "Checked the EMI on a ₹86 L home", **details}
+    step = next_step(label, **fields)
+    assert (step.action, step.urgency) == (action, urgency)
+
+
+def test_a_brief_has_three_plain_lines_and_a_next_step(client):
+    visitor_id, _ = enquiring_visitor(client)
+    brief = client.get(f"/visitors/{visitor_id}/brief").json()
+    assert len(brief["lines"]) == 3 and brief["mode"] == "template"
+    assert "Aranya Courtyard" in brief["lines"][0] and "Has shared contact details" in brief["lines"][2]
+    assert brief["next_step"]["action"] in ("call", "whatsapp")
+    assert client.get("/visitors/nobody-here/brief").status_code == 404
+
+
+class FakeWriter:
+    def __init__(self, answer=None, error=None):
+        self.answer, self.error, self.sent = answer, error, []
+
+    def available(self):
+        return True
+
+    def generate_json(self, system, messages, schema, **kwargs):
+        self.sent.append(system + messages[0]["content"])
+        if self.error:
+            raise self.error
+        return self.answer
+
+
+def test_the_llm_brief_is_kept_until_the_score_changes(client, monkeypatch):
+    visitor_id, _ = enquiring_visitor(client)
+    fake = FakeWriter({"lines": ["Wants a 3 BHK.", "Checked the EMI.", "Ask about the loan."]})
+    monkeypatch.setattr(brief_module, "llm", fake)
+    assert client.get(f"/visitors/{visitor_id}/brief").json()["mode"] == "llm"
+    assert client.get(f"/visitors/{visitor_id}/brief").json()["lines"][0] == "Wants a 3 BHK."
+    assert len(fake.sent) == 1
+    client.post("/feedback", json={"visitor_id": visitor_id, "label": "genuine"})
+    client.get(f"/visitors/{visitor_id}/brief")
+    assert len(fake.sent) == 2
+
+
+def test_a_bad_llm_brief_falls_back(client, monkeypatch):
+    visitor_id, _ = enquiring_visitor(client)
+    for fake in (FakeWriter({"lines": ["Only one line."]}), FakeWriter(error=LLMError("timeout"))):
+        monkeypatch.setattr(brief_module, "llm", fake)
+        assert client.get(f"/visitors/{visitor_id}/brief").json()["mode"] == "template"
+
+
+# ---------------------------------------------------------------- follow-up drafts
+
+
+def test_a_whatsapp_draft_is_ready_to_send(client):
+    visitor_id, number = enquiring_visitor(client)
+    draft = client.post(f"/visitors/{visitor_id}/followup", json={"channel": "whatsapp"}).json()
+    assert draft["text"].startswith("Hi Priya,") and "Aranya Courtyard" in draft["text"] and "₹59,706" in draft["text"]
+    assert draft["whatsapp_number"] == "91" + number and draft["whatsapp_url"].startswith(f"https://wa.me/91{number}?text=Hi%20Priya")
+    assert draft["mode"] == "template"
+
+
+def test_an_email_draft_has_a_subject(client):
+    visitor_id, _ = enquiring_visitor(client)
+    draft = client.post(f"/visitors/{visitor_id}/followup", json={"channel": "email"}).json()
+    assert "Aranya Courtyard" in draft["subject"] and draft["text"].endswith("LeadOps Realty sales team")
+    assert draft["mailto_url"].startswith("mailto:priya.k@gmail.com?subject=")
+
+
+@pytest.mark.parametrize(("language", "greeting"), [("hinglish", "Namaste Priya"), ("hi", "नमस्ते Priya"), ("mr", "नमस्कार Priya")])
+def test_drafts_in_the_buyers_language(client, language, greeting):
+    visitor_id, _ = enquiring_visitor(client)
+    assert client.post(f"/visitors/{visitor_id}/followup", json={"language": language}).json()["text"].startswith(greeting)
+
+
+def test_a_draft_follows_the_language_they_chatted_in(client):
+    visitor_id, _ = enquiring_visitor(client)
+    client.post("/chat", json={"visitor_id": visitor_id, "message": "पुण्यात 90 लाखांपर्यंत 3BHK हवा आहे"})
+    draft = client.post(f"/visitors/{visitor_id}/followup", json={}).json()
+    assert draft["language"] == "mr" and draft["text"].startswith("नमस्कार Priya")
+
+
+def test_names_and_numbers_never_reach_the_llm(client, monkeypatch):
+    visitor_id, number = enquiring_visitor(client, name="Sunita Rangarajan", email="sunita.r@gmail.com")
+    fake = FakeWriter({"subject": "Your home", "text": "Hi {name}, thanks for looking at Aranya Courtyard. Can you visit on Saturday?"})
+    monkeypatch.setattr(brief_module, "llm", fake)
+    draft = client.post(f"/visitors/{visitor_id}/followup", json={"channel": "email"}).json()
+    assert draft["mode"] == "llm" and draft["text"].startswith("Hi Sunita,")
+    fake.answer = {"lines": ["One.", "Two.", "Three."]}
+    client.get(f"/visitors/{visitor_id}/brief")
+    assert len(fake.sent) == 2
+    for sent in fake.sent:
+        assert "Sunita" not in sent and "Rangarajan" not in sent and number not in sent and "sunita.r" not in sent
+
+
+def test_a_draft_without_the_placeholder_uses_the_template(client, monkeypatch):
+    visitor_id, _ = enquiring_visitor(client)
+    monkeypatch.setattr(brief_module, "llm", FakeWriter({"subject": "Hi", "text": "Dear customer, please call us."}))
+    assert client.post(f"/visitors/{visitor_id}/followup", json={}).json()["mode"] == "template"
+
+
+def test_a_draft_for_someone_without_a_number(client):
+    visitor_id, _ = serious_visitor(client)
+    draft = client.post(f"/visitors/{visitor_id}/followup", json={}).json()
+    assert draft["text"].startswith("Hi there,") and draft["whatsapp_url"] is None and draft["mailto_url"] is None
+    assert client.post("/visitors/nobody-here/followup", json={}).status_code == 404
+
+
+# ---------------------------------------------------------------- sales verdicts
+
+
+def visitor_now(client, visitor_id):
+    return client.get(f"/visitors/{visitor_id}").json()["visitor"]
+
+
+def test_fake_makes_a_visitor_junk_at_once(client):
+    visitor_id, _ = enquiring_visitor(client)
+    assert client.post("/feedback", json={"visitor_id": visitor_id, "label": "fake", "note": "Wrong number"}).status_code == 201
+    visitor = visitor_now(client, visitor_id)
+    assert visitor["label"] == "Junk" and visitor["score"]["reasons"][0] == "Marked fake by the sales team"
+    assert visitor["feedback"]["label"] == "fake" and visitor["feedback"]["note"] == "Wrong number"
+    assert client.get(f"/visitors/{visitor_id}/brief").json()["next_step"]["action"] == "none"
+
+
+def test_genuine_overrules_the_rules_and_the_model(client):
+    visitor_id, session_id = str(uuid.uuid4()), str(uuid.uuid4())
+    post(client, visitor_id, session_id, still_here(), {**CONTEXT, "webdriver": True})
+    assert visitor_now(client, visitor_id)["label"] == "Bot"
+    client.post("/feedback", json={"visitor_id": visitor_id, "label": "genuine"})
+    visitor = visitor_now(client, visitor_id)
+    assert visitor["label"] == "Cold" and visitor["score"]["reasons"][0] == "Confirmed genuine by the sales team"
+
+
+def test_a_verdict_on_an_enquiry_reaches_its_visitor(client):
+    visitor_id, _ = enquiring_visitor(client)
+    lead_id = client.get(f"/visitors/{visitor_id}").json()["leads"][0]["id"]
+    client.post("/feedback", json={"lead_id": lead_id, "label": "converted"})
+    assert visitor_now(client, visitor_id)["feedback"]["label"] == "converted"
+    assert client.get(f"/leads/{lead_id}").json()["verdict"] == "converted"
+    assert client.get(f"/visitors/{visitor_id}/brief").json()["next_step"]["text"].startswith("Nothing to do")
+
+
+def test_the_latest_verdict_wins(client):
+    visitor_id, _ = enquiring_visitor(client)
+    client.post("/feedback", json={"visitor_id": visitor_id, "label": "fake"})
+    client.post("/feedback", json={"visitor_id": visitor_id, "label": "genuine"})
+    assert visitor_now(client, visitor_id)["label"] != "Junk"

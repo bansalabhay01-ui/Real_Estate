@@ -5,7 +5,8 @@ from typing import Literal
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from fastapi.concurrency import run_in_threadpool
 
-from ..schemas import NudgeOut, RescoreOut, StatsOut, VisitorDetailOut, VisitorOut
+from ..ai.brief import build_brief, build_followup
+from ..schemas import BriefOut, FollowUpIn, FollowUpOut, NudgeOut, RescoreOut, StatsOut, VisitorDetailOut, VisitorOut
 from ..scoring.engine import broadcast_snapshot, rescore_all
 from ..scoring.nudge import OfferRefused, queue_offer
 from ..tracking import dashboard_stats, list_visitors, visitor_detail
@@ -38,6 +39,24 @@ def get_visitor(visitor_id: str) -> VisitorDetailOut:
     if detail is None:
         raise HTTPException(status_code=404, detail="Visitor not found")
     return detail
+
+
+@router.get("/visitors/{visitor_id}/brief", response_model=BriefOut)
+def get_brief(visitor_id: str) -> BriefOut:
+    """Three plain lines about this visitor and the recommended next step."""
+    brief = build_brief(visitor_id)
+    if brief is None:
+        raise HTTPException(status_code=404, detail="Visitor not found")
+    return brief
+
+
+@router.post("/visitors/{visitor_id}/followup", response_model=FollowUpOut)
+def draft_followup(visitor_id: str, payload: FollowUpIn) -> FollowUpOut:
+    """A WhatsApp or email draft in the buyer's language, to edit and send."""
+    draft = build_followup(visitor_id, payload.channel, payload.language)
+    if draft is None:
+        raise HTTPException(status_code=404, detail="Visitor not found")
+    return draft
 
 
 @router.post("/visitors/{visitor_id}/nudge", response_model=NudgeOut, status_code=201)

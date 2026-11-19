@@ -6,7 +6,7 @@ import { IntentMeter, LabelBadge, LeadChecks, shortId, SignalChips } from "../da
 import SimulateTraffic from "../dashboard/SimulateTraffic";
 import { useDashboardFeed, useFilteredVisitors } from "../dashboard/useDashboardFeed";
 import VisitorDetail from "../dashboard/VisitorDetail";
-import { updateVisit } from "../lib/api";
+import { sendVerdict, updateVisit } from "../lib/api";
 import { profilePhrases, timeAgo } from "../lib/format";
 
 const STATUS = {
@@ -106,7 +106,7 @@ function VisitorsTable({ visitors, filter, loading, failed, updatedAt, selectedI
     );
   }
   return (
-    <div className="overflow-x-auto">
+    <div className="relative overflow-x-auto">
       <table className="w-full min-w-[780px] text-left text-sm">
         <thead className="border-b border-line text-muted">
           <tr>
@@ -178,7 +178,7 @@ function LeadsTable({ leads, onSelect, now }) {
     return <p className="px-4 py-6 text-sm text-muted">No enquiries yet. They appear here the moment a form is sent.</p>;
   }
   return (
-    <div className="overflow-x-auto">
+    <div className="relative overflow-x-auto">
       <table className="w-full min-w-[760px] text-left text-sm">
         <thead className="border-b border-line text-muted">
           <tr>
@@ -189,6 +189,7 @@ function LeadsTable({ leads, onSelect, now }) {
             <th scope="col" className={th}>Home</th>
             <th scope="col" className={th}>Visitor</th>
             <th scope="col" className={th}>Checks</th>
+            <th scope="col" className={th}>Verdict</th>
           </tr>
         </thead>
         <tbody>
@@ -213,6 +214,22 @@ function LeadsTable({ leads, onSelect, now }) {
               <td className={td}>
                 <LeadChecks lead={lead} />
               </td>
+              <td className={td}>
+                <label className="sr-only" htmlFor={`verdict-${lead.id}`}>
+                  Verdict on {lead.name}
+                </label>
+                <select
+                  id={`verdict-${lead.id}`}
+                  value={lead.verdict ?? ""}
+                  onChange={(event) => event.target.value && sendVerdict({ lead_id: lead.id, label: event.target.value }).catch(() => {})}
+                  className="rounded border border-line bg-white px-1.5 py-1 text-xs"
+                >
+                  <option value="">Choose</option>
+                  <option value="genuine">Genuine</option>
+                  <option value="fake">Fake</option>
+                  <option value="converted">Converted</option>
+                </select>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -234,7 +251,7 @@ function VisitsTable({ visits, onSelect }) {
     return <p className="px-4 py-6 text-sm text-muted">No site visits yet. Buyers can book one through the assistant.</p>;
   }
   return (
-    <div className="overflow-x-auto">
+    <div className="relative overflow-x-auto">
       <table className="w-full min-w-[640px] text-left text-sm">
         <thead className="border-b border-line text-muted">
           <tr>

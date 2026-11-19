@@ -10,6 +10,11 @@ from .model import HumanCheck
 from .rules import BOT, CERTAIN, JUNK, STRONG, Signal
 
 MAX_REASONS = 5
+VERDICT_REASONS = {
+    "fake": "Marked fake by the sales team",
+    "genuine": "Confirmed genuine by the sales team",
+    "converted": "Converted: this buyer has gone ahead",
+}
 
 
 def known(value) -> float | None:
@@ -101,7 +106,7 @@ def _by_strength(signals: list[Signal]) -> list[str]:
 
 
 def reasons_for(label: str, *, signals: list[Signal], check: HumanCheck, features: dict, points: list,
-                intent: int, visitor_type: dict | None = None) -> list[str]:
+                intent: int, visitor_type: dict | None = None, verdict: str | None = None) -> list[str]:
     """Up to five reasons for this label, the most important first."""
     bot = [s for s in signals if s.layer == BOT]
     junk = [s for s in signals if s.layer == JUNK]
@@ -126,6 +131,8 @@ def reasons_for(label: str, *, signals: list[Signal], check: HumanCheck, feature
             found += buying[1:2]
     else:
         found = buying[:4] or ["Only a quick look so far"]
+    if verdict in VERDICT_REASONS:
+        found = [VERDICT_REASONS[verdict], *found]
     unique = list(dict.fromkeys(found))  # keep the order, drop repeats
     return unique[:MAX_REASONS]
 

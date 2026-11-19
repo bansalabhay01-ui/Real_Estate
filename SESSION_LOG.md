@@ -5,9 +5,9 @@ A short diary of LeadOps work sessions, newest first. Claude saves each session 
 ## Current status
 _Last updated: 2026-11-18_
 
-- **Phase:** Week 3 (Integration + Wow) in progress: Parts 1-3 of 6 done. Deadline about 30 Nov 2026.
-- **Done:** the Week 1 foundation (demo property site, tracking SDK, FastAPI backend, a basic property assistant in English, Hinglish and Hindi, the live sales dashboard, the traffic simulator, the shared contracts draft), all of Week 2 ("Week 2 Build Plan" in `LEADOPS_PLAN.md`: tester links, simulator v2, features and rules, the LightGBM human check with SHAP, intent points, labels and reasons, dashboard v1, three real Playwright bots, LLM extraction and visitor type) and Week 3 Parts 1-3: the dashboard's Simulate traffic button with a live scoreboard and Run a real bot; the assistant as a LangGraph agent with brochure answers, EMIs, site visits and Marathi; the smart engagement trigger that turns serious anonymous visitors into leads. 175 tests pass.
-- **Next:** Week 3 Part 4: the lead brief, follow-up drafts and sales verdicts. Classmates can start test sessions now (README, "Collecting real test sessions"); the real test set has no human sessions yet.
+- **Phase:** Week 3 (Integration + Wow) in progress: Parts 1-4 of 6 done. Deadline about 30 Nov 2026.
+- **Done:** the Week 1 foundation (demo property site, tracking SDK, FastAPI backend, a basic property assistant in English, Hinglish and Hindi, the live sales dashboard, the traffic simulator, the shared contracts draft), all of Week 2 ("Week 2 Build Plan" in `LEADOPS_PLAN.md`: tester links, simulator v2, features and rules, the LightGBM human check with SHAP, intent points, labels and reasons, dashboard v1, three real Playwright bots, LLM extraction and visitor type) and Week 3 Parts 1-4: the dashboard's Simulate traffic button with a live scoreboard and Run a real bot; the assistant as a LangGraph agent with brochure answers, EMIs, site visits and Marathi; the smart engagement trigger that turns serious anonymous visitors into leads; the lead brief with a next step, follow-up drafts in the buyer's language, one-click site visits and sales verdicts. 204 tests pass.
+- **Next:** Week 3 Part 5: the consistency check and learning from sales verdicts. Classmates can start test sessions now (README, "Collecting real test sessions"); the real test set has no human sessions yet.
 - **Blocked:** the LLM features haven't been tried with a real API key (the user hasn't approved spending it); template mode and the keyword rules work, and Claude's request shape matches the API reference.
 - **Code:** https://github.com/bansalabhay01-ui/Real_Estate (branch `main`)
 
@@ -33,9 +33,14 @@ _Last updated: 2026-11-18_
   - It travels back in the `/events` response as `nudge`. SDK 1.2 hands it to `LeadOps.onNudge(fn)`. The demo site shows an offer card above the assistant button; accepting opens the assistant with the contact form and sends an enquiry with `source: "assistant_offer"`.
   - Dashboard: a "Found by the assistant" tile and alert, offers in the visitor's timeline, and **Send an offer now** for anonymous Warm or Hot visitors (`POST /visitors/{id}/nudge`).
   - Checked: 175 tests pass and the frontend builds. A headless Edge check passed 12/12: the offer appeared for a serious anonymous visitor, accepting it created a lead marked as found by the assistant, a hand-sent offer arrived with the next batch, no sideways scroll at phone width, no page errors. The check found one bug, now fixed: the visitor panel didn't refresh after sending an offer.
+- **Part 4, lead brief, follow-ups and verdicts:**
+  - `backend/app/ai/brief.py`: `GET /visitors/{id}/brief` gives three plain lines and a next step from rules (call now, send an offer, WhatsApp today, check first, confirm the visit, or nothing). `POST /visitors/{id}/followup` drafts a WhatsApp or email message in English, Hinglish, Hindi or Marathi, with a `wa.me` link. With a key the LLM writes both, only when a salesperson asks; a brief is kept until the score changes. The LLM never sees a name, number or email: drafts use a `{name}` placeholder that the backend fills in.
+  - Sales verdicts count at once: Fake makes a visitor `Junk`; Genuine and Converted overrule the rules and the model, leaving the intent score to decide. The latest verdict is kept on the visitor and shown as a chip and in the enquiries table.
+  - Dashboard: `frontend/src/dashboard/LeadBrief.jsx` opens the visitor panel with the brief, the next step, an editable follow-up draft (Copy, Open in WhatsApp, Open in email), one-click site-visit booking, Send an offer now and the verdict buttons.
+  - Checked: 204 tests pass and the frontend builds. A headless Edge check passed 15/15. It found one bug, now fixed: screen-reader labels inside wide tables made the whole page scroll sideways on phones.
 
 **Next**
-- Week 3 Part 4: the lead brief, follow-up drafts and sales verdicts.
+- Week 3 Part 5: the consistency check and learning from sales verdicts.
 
 **Notes**
 - Teammates: run `pip install -r requirements.txt` in `backend/` again for `langgraph`.

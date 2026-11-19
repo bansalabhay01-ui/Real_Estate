@@ -111,7 +111,8 @@ Response `201`: `{"ok": true, "lead_id": 12}`.
   value is dropped, never rejected. `LeadOut` always has it.
 - `LeadOut` (in `GET /leads` and the WebSocket) adds `label` (the visitor's current label, or `null`) and
   `checks`: `[{"check": "phone", "ok": false, "text": "Phone: the same digit over and over"}, ...]` for `phone`,
-  `email`, `name`, `message`, `honeypot` and `fill_time` (only the ones that apply).
+  `email`, `name`, `message`, `honeypot` and `fill_time` (only the ones that apply), and `verdict` (the sales team's
+  latest verdict on this visitor, or `null`).
 
 ## 3. Assistant: frontend -> `POST /chat`
 
@@ -162,6 +163,8 @@ is outside the next 60 days, `404` for an unknown home.
 | `GET /visitors?limit=&offset=&label=&sort=` | visitors, most recent activity first; `label=Hot` filters, `sort=intent` puts the highest intent first | B |
 | `GET /visitors/{id}` | one visitor: sessions, events (newest first, up to 200), enquiries, chat, site visits, offers (`nudges`), `score_detail` | B |
 | `POST /visitors/{id}/nudge` | "Send an offer now": queue an offer that reaches the browser with the visitor's next event batch. `201` with the offer; `409` if they already shared contact details or are labelled Bot or Junk | B |
+| `GET /visitors/{id}/brief` | `{lines: [three strings], next_step: {text, urgency: "now" / "today" / "this_week" / "none", action: "call" / "offer" / "whatsapp" / "review" / "confirm_visit" / "none"}, mode: "llm" / "template"}` | C |
+| `POST /visitors/{id}/followup` | `{channel: "whatsapp" / "email", language: "auto" / "en" / "hinglish" / "hi" / "mr"}` returns a draft: `{channel, language, subject, text, mode, whatsapp_number, whatsapp_url, email, mailto_url}` | C |
 | `GET /stats` | `{visitors, active_now, leads, chatting_visitors, labels, assistant_leads, offers_sent, offers_accepted}` for the dashboard; `labels` counts visitors per label, e.g. `{"Hot": 4, "Bot": 120}` | B |
 | `POST /scoring/rescore` | reload the model (after `ml/train.py`) and relabel every visitor in the background: `{"ok": true, "visitors": 512}` | B |
 | `GET /listings?city=&bhk=&min_price=&max_price=&q=` | listings | B |
@@ -169,7 +172,7 @@ is outside the next 60 days, `404` for an unknown home.
 | `POST /leads`, `GET /leads`, `GET /leads/{id}` | enquiries | B |
 | `POST /chat`, `GET /chat/{visitor_id}` | the assistant and a visitor's conversation | C |
 | `POST /visits`, `GET /visits?status=&limit=`, `PATCH /visits/{id}` | site visits, soonest first; `PATCH` takes `{status, day, slot}` | B |
-| `POST /feedback`, `GET /feedback` | sales verdicts: `genuine` / `fake` / `converted` | B |
+| `POST /feedback`, `GET /feedback` | sales verdicts: `genuine` / `fake` / `converted`. A verdict relabels the visitor at once (section 6) | B |
 | `WS /ws/dashboard` | live dashboard feed | B |
 | `POST /demo/simulate` | `{bots, junk, genuine, seconds, seed}` (defaults 200 / 30 / 20 over 30 s): send simulated traffic through the real ingestion code. `202 {"ok": true, "run_id": "...", "total": 250, "seconds": 30}`, `409` while a run is going | B |
 | `GET /demo/status` | `{running, run_id, sent, total, labels, scoreboard, simulated_visitors, bot_available, bot_running}` | B |
@@ -215,14 +218,16 @@ score. `score_update` follows only when the label changed (use it for "new Hot l
 
 `VisitorOut` fields: `id`, `site`, `first_seen`, `last_seen`, `session_count`, `page_views`, `event_count`,
 `lead_count`, `chat_count`, `last_path`, `last_ip`, `device`, `automation_hints`, `profile`, `label`,
-`test_label` (`genuine` / `junk` / `bot` on test sessions, otherwise `null`) and `score` (section 6, `null` until
-scored). `automation_hints` lists raw signals (`webdriver`, `automation_user_agent`, `no_browser_languages`,
-`no_user_agent`); it is not a verdict.
+`test_label` (`genuine` / `junk` / `bot` on test sessions, otherwise `null`), `score` (section 6, `null` until
+scored) and `feedback` (the sales team's latest verdict: `{label, note, created_at}`, otherwise `null`).
+`automation_hints` lists raw signals (`webdriver`, `automation_user_agent`, `no_browser_languages`, `no_user_agent`);
+it is not a verdict.
 
 ## 6. Scores and labels
 
 `label` is one of `Bot`, `Junk`, `Review`, `Cold`, `Warm`, `Hot` (the rules are in `LEADOPS_PLAN.md`, Week 2
-Build Plan, and `backend/app/scoring/combine.py`).
+Build Plan, and `backend/app/scoring/combine.py`). A sales verdict overrules them: `fake` makes the visitor `Junk`;
+`genuine` and `converted` leave only the intent score to decide (`Cold`, `Warm` or `Hot`).
 
 `VisitorOut.score`:
 

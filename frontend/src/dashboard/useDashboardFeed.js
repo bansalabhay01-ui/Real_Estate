@@ -64,6 +64,9 @@ export function useDashboardFeed() {
         } else if (message.type === "visitor_update") {
           const visitor = message.visitor;
           setVisitors((current) => [visitor, ...current.filter((item) => item.id !== visitor.id)].slice(0, MAX_VISITORS));
+          setLeads((current) =>
+            current.map((lead) => (lead.visitor_id === visitor.id ? { ...lead, label: visitor.label, verdict: visitor.feedback?.label ?? null } : lead)),
+          );
           setUpdatedAt((current) => ({ ...current, [visitor.id]: Date.now() }));
         } else if (message.type === "lead_created") {
           setLeads((current) => [message.lead, ...current.filter((item) => item.id !== message.lead.id)]);
