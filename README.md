@@ -4,8 +4,24 @@ LeadOps finds the genuine buyers among a real estate website's visitors. One scr
 every visitor is scored live (Bot, Junk, Review, Cold, Warm or Hot, with the reasons), and the sales team watches
 them arrive on a live dashboard, with the buyer details the assistant picked up.
 
-Built so far, from [LEADOPS_PLAN.md](LEADOPS_PLAN.md): a demo property site, the tracking SDK, the event API, a
-basic property assistant, a live sales dashboard, a traffic simulator (Week 1) and the scoring engine (Week 2).
+![The sales dashboard after 250 simulated visitors arrived](docs/screenshots/dashboard.png)
+
+| | |
+|---|---|
+| **The demo property site**<br>![The demo site's home page](docs/screenshots/site.png) | **The assistant answers from the brochure**<br>![The assistant explaining a payment plan](docs/screenshots/assistant.png) |
+| **A hot lead, with the next step**<br>![A hot lead's brief on the dashboard](docs/screenshots/visitor.png) | **A real stealth bot, caught and explained**<br>![A stealth bot labelled Bot, with the reasons](docs/screenshots/bot.png) |
+
+![The analytics page: the funnel, visitors by label and traffic per day](docs/screenshots/analytics.png)
+
+## Results
+
+Measured by `ml/evaluate.py`. The details are in [docs/RESULTS.md](docs/RESULTS.md).
+
+| Test | Result |
+|---|---|
+| **Real people** | Not measured yet: this needs 30 to 50 test sessions (see "Collecting real test sessions") |
+| **Real bots** (three bots the team wrote, 15 runs) | 15 of 15 caught (95% confidence interval: 80% to 100%) |
+| **Simulated traffic** (1,000 visitors, the easiest test) | 600 of 600 fake visitors filtered out, 400 of 400 buyers kept |
 
 ## What's where
 
@@ -17,8 +33,11 @@ basic property assistant, a live sales dashboard, a traffic simulator (Week 1) a
 | `backend/app/ai/` | LLM wrapper, the LangGraph assistant, buyer-detail extraction, listing and brochure search | C |
 | `backend/app/scoring/` | the scoring engine: features, rules, the LightGBM model, labels and reasons | B |
 | `backend/data/` | `listings.json` (18 fictional homes in 5 cities), a fictional brochure for each, throwaway email domains, the trained model | everyone |
-| `ml/` | `simulator.py` (labelled bot / junk / genuine traffic) and `train.py` (trains the model) | B |
+| `ml/` | `simulator.py` (labelled bot / junk / genuine traffic), `bots/` (real Playwright bots), `train.py` (trains the model) and `evaluate.py` (measures it) | B |
 | `docs/CONTRACTS.md` | the shared JSON contracts; read it before changing an API | everyone |
+| `docs/ARCHITECTURE.md` | how the system fits together | everyone |
+| `docs/DEMO_SCRIPT.md` | the 3-minute run sheet, the backup plan and likely questions | everyone |
+| `docs/DEPLOY.md` | putting it online with Neon, Render and Vercel | everyone |
 
 ## Run it
 
