@@ -33,6 +33,10 @@ export const sendChat = (message, listingId) =>
 
 export const getChatHistory = (visitorId) => request(`/chat/${encodeURIComponent(visitorId)}`);
 
+export const bookVisit = (fields) => request("/visits", { method: "POST", body: { ...visitorIds(), ...fields } });
+export const getVisits = () => request("/visits?limit=100");
+export const updateVisit = (id, change) => request(`/visits/${id}`, { method: "PATCH", body: change });
+
 export const getVisitor = (id) => request(`/visitors/${encodeURIComponent(id)}`);
 
 // { label: "Hot" | undefined, sort: "recent" | "intent", limit }

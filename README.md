@@ -14,9 +14,9 @@ basic property assistant, a live sales dashboard, a traffic simulator (Week 1) a
 | `frontend/` | React demo site (`/`, `/property/:id`) and the sales dashboard (`/dashboard`) | A |
 | `sdk/` | `leadops.js`, the tracking script, and `demo.html`, a plain page that uses it | A |
 | `backend/app/` | FastAPI: events, listings, enquiries, chat, feedback, dashboard WebSocket | B |
-| `backend/app/ai/` | LLM wrapper, buyer-detail extraction, listing search, the assistant | C |
+| `backend/app/ai/` | LLM wrapper, the LangGraph assistant, buyer-detail extraction, listing and brochure search | C |
 | `backend/app/scoring/` | the scoring engine: features, rules, the LightGBM model, labels and reasons | B |
-| `backend/data/` | `listings.json` (18 fictional homes in 5 cities), throwaway email domains, the trained model | everyone |
+| `backend/data/` | `listings.json` (18 fictional homes in 5 cities), a fictional brochure for each, throwaway email domains, the trained model | everyone |
 | `ml/` | `simulator.py` (labelled bot / junk / genuine traffic) and `train.py` (trains the model) | B |
 | `docs/CONTRACTS.md` | the shared JSON contracts; read it before changing an API | everyone |
 
@@ -65,8 +65,9 @@ Open http://localhost:5173 for the demo site and http://localhost:5173/dashboard
 2. Open http://localhost:8000/sdk/demo.html, a plain HTML page with the same script tag. That visit appears too.
    To show it working on a different website, serve it from another address:
    `python -m http.server 5500 --directory sdk`, then open http://localhost:5500/demo.html.
-3. Ask the assistant "3BHK under 90L in Pune?" or "Pune mein 90 lakh tak 3BHK chahiye". It answers from the
-   listings and saves the budget, BHK and city on the visitor.
+3. Ask the assistant "3BHK under 90L in Pune?", "Pune mein 90 lakh tak 3BHK chahiye" or "पुण्यात 90 लाखांपर्यंत 3BHK हवा
+   आहे". It answers from the listings and saves the budget, BHK and city on the visitor. Then try "What's the payment
+   plan at Aranya Courtyard?", "EMI with 30% down?" and "Book a site visit on Saturday morning".
 4. Send an enquiry from a property page. The dashboard shows its label and its checks: phone, email, name, message,
    the hidden honeypot field and how fast the form was filled in.
 5. On the dashboard, press **Simulate traffic**: 200 bots, 30 junk leads and 20 real buyers arrive over about 30
@@ -190,12 +191,28 @@ less), `GEMINI_API_KEY` or `GROQ_API_KEY`. `GET /health` shows which one is in u
 falls back to templates, so a demo never breaks. Phone numbers and emails are masked before text reaches an LLM,
 and names are never sent.
 
+The assistant is a [LangGraph](https://langchain-ai.github.io/langgraph/) graph (`backend/app/ai/agent.py`). LangGraph only
+runs the steps; every LLM call still goes through `llm_client.py`.
+
+```mermaid
+flowchart LR
+    understand --> search_properties
+    search_properties -.-> calc_emi & brochure_search & book_visit & request_call
+    search_properties -.-> reply
+    calc_emi & brochure_search & book_visit & request_call --> reply
+    reply --> save_lead_details
+```
+
+It answers in English, Hindi, Hinglish and Marathi, and its templates cover all four when there is no key. Brochure
+questions are answered from `backend/data/brochures/` with BM25 keyword search. When contact details are needed the
+chat shows a small form, so phone numbers never pass through the LLM.
+
 With a key, the LLM does three jobs, each falling back to rules if a call fails:
 
-- **Replies** in the visitor's language (one call per chat message).
-- **Detail extraction** (`backend/app/ai/extract.py`): reads the message with the last few turns ("same budget,
-  but in Bengaluru", "80-85 lakh ke beech"). Every value is checked (a known city, a sensible budget, BHK 1 to 6)
-  before it's saved. This is one more short call per chat message; Claude returns it as a structured output.
+- **Understanding** (`understand` in `agent.py`, `extract.py`): reads the message with the last few turns ("same budget,
+  but in Bengaluru", "80-85 lakh ke beech") and works out what the visitor wants. Every value is checked (a known
+  city, a sensible budget, BHK 1 to 6) before it's used. Claude returns it as a structured output.
+- **Replies** in the visitor's language, written only from what the tools found.
 - **Visitor type** (`backend/app/ai/classify.py`): end buyer, investor, tenant, broker or spam, from the enquiry
   message and chat, worked out after the response is sent so nobody waits. It runs again only when the messages
   change. Without a key, keyword rules do this ("on rent", "channel partner", "rental yield"); a confident broker,

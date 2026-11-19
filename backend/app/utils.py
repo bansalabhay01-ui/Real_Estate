@@ -1,7 +1,7 @@
 """Small helpers shared across the backend."""
 
 import re
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta, timezone
 from typing import Any
 
 from starlette.requests import HTTPConnection
@@ -10,6 +10,19 @@ from starlette.requests import HTTPConnection
 def utcnow() -> datetime:
     """Current time in UTC without tzinfo. The database stores UTC everywhere (SQLite has no time zones)."""
     return datetime.now(UTC).replace(tzinfo=None)
+
+
+IST = timezone(timedelta(hours=5, minutes=30))
+
+
+def today_ist() -> date:
+    """Today in India: site visits are booked by the buyer's calendar, not the server's."""
+    return datetime.now(IST).date()
+
+
+def short_day(day: date) -> str:
+    """"Sat 21 Nov"."""
+    return f"{day:%a} {day.day} {day:%b}"
 
 
 def iso(value: datetime | None) -> str | None:

@@ -5,9 +5,9 @@ A short diary of LeadOps work sessions, newest first. Claude saves each session 
 ## Current status
 _Last updated: 2026-11-18_
 
-- **Phase:** Week 3 (Integration + Wow) in progress: Part 1 of 6 done. Deadline about 30 Nov 2026.
-- **Done:** the Week 1 foundation (demo property site, tracking SDK, FastAPI backend, a basic property assistant in English, Hinglish and Hindi, the live sales dashboard, the traffic simulator, the shared contracts draft), all of Week 2 ("Week 2 Build Plan" in `LEADOPS_PLAN.md`: tester links, simulator v2, features and rules, the LightGBM human check with SHAP, intent points, labels and reasons, dashboard v1, three real Playwright bots, LLM extraction and visitor type) and Week 3 Part 1: the dashboard's Simulate traffic button with a live scoreboard, and Run a real bot. 118 tests pass.
-- **Next:** Week 3 Part 2: assistant v2 (LangGraph agent, brochures, EMI, site visits, Marathi). Classmates can start test sessions now (README, "Collecting real test sessions"); the real test set has no human sessions yet.
+- **Phase:** Week 3 (Integration + Wow) in progress: Parts 1-2 of 6 done. Deadline about 30 Nov 2026.
+- **Done:** the Week 1 foundation (demo property site, tracking SDK, FastAPI backend, a basic property assistant in English, Hinglish and Hindi, the live sales dashboard, the traffic simulator, the shared contracts draft), all of Week 2 ("Week 2 Build Plan" in `LEADOPS_PLAN.md`: tester links, simulator v2, features and rules, the LightGBM human check with SHAP, intent points, labels and reasons, dashboard v1, three real Playwright bots, LLM extraction and visitor type) and Week 3 Parts 1-2: the dashboard's Simulate traffic button with a live scoreboard and Run a real bot; the assistant as a LangGraph agent with brochure answers, EMIs, site visits and Marathi. 160 tests pass.
+- **Next:** Week 3 Part 3: the smart engagement trigger. Classmates can start test sessions now (README, "Collecting real test sessions"); the real test set has no human sessions yet.
 - **Blocked:** the LLM features haven't been tried with a real API key (the user hasn't approved spending it); template mode and the keyword rules work, and Claude's request shape matches the API reference.
 - **Code:** https://github.com/bansalabhay01-ui/Real_Estate (branch `main`)
 
@@ -22,9 +22,19 @@ _Last updated: 2026-11-18_
   - `backend/app/retention.py`: `erase_visitors()` removes a visitor and everything linked to it. `classify_visitor(use_llm=False)`: simulated traffic never calls an LLM.
   - Dashboard: a "Live demo" panel (`frontend/src/dashboard/SimulateTraffic.jsx`) with the dialog, a progress bar, label counts as they arrive, the scoreboard, a breakdown by kind of visitor, Clear and Run a real bot. Simulated rows get a "Simulated" chip.
   - Checked: 118 tests pass and the frontend builds. A headless Edge check passed 12/12 (a 60-visitor run through the button: 40/40 bots blocked, 10/10 junk filtered, 10/10 buyers kept; Clear; no sideways scroll at phone width; no page errors). The stealth bot launched through `POST /demo/bot` was labelled `Bot` by the ML model alone.
+- **Part 2, assistant v2:**
+  - `backend/app/ai/agent.py`: the assistant is a LangGraph graph: understand, search_properties, one of calc_emi / brochure_search / book_visit / request_call, reply, save_lead_details. One structured LLM call understands the message (patterns without a key), so a message still makes two LLM calls while the visitor waits. If the graph itself fails, a plain template answer still goes out. `LANGSMITH_TRACING` is forced off, so conversations never leave for a tracing service.
+  - `backend/data/brochures/`: 18 fictional brochures. `backend/app/ai/brochures.py`: BM25 keyword search, with Hindi, Hinglish and Marathi words mapped to the brochures' English words.
+  - Site visits: the `site_visits` table, `POST / GET / PATCH /visits` (`backend/app/api/visits.py`), 15 intent points, `visit_booked` and `visit_updated` on the WebSocket, and a Site visits panel on the dashboard. Contact details are collected in a form in the chat (`frontend/src/components/ContactCapture.jsx`), never as chat text. `Lead.source` records where an enquiry came from.
+  - Languages: Marathi joins English, Hinglish and Hindi in detection, patterns (including Devanagari digits), replies and the form. A short reply keeps the conversation's language.
+  - Checked: 160 tests pass (with fake LLMs for the LLM paths) and the frontend builds. A headless Edge check passed 13/13: a payment-plan answer from the brochure, an EMI with 30% down, a Saturday-morning visit booked through the form, a Marathi reply, the visit confirmed from the dashboard with its intent points, no sideways scroll at phone width, no page errors.
 
 **Next**
-- Week 3 Part 2: assistant v2.
+- Week 3 Part 3: the smart engagement trigger.
+
+**Notes**
+- Teammates: run `pip install -r requirements.txt` in `backend/` again for `langgraph`.
+- `rag.py` now matches whole-word starts: "emi" used to match "premium".
 
 ---
 

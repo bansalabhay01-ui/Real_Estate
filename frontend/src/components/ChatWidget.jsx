@@ -1,16 +1,43 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, matchPath, useLocation } from "react-router";
 import { getChatHistory, sendChat } from "../lib/api";
-import { formatPrice } from "../lib/format";
+import { formatPrice, formatRupees } from "../lib/format";
 import { track, visitorIds } from "../lib/leadops";
+import ContactCapture from "./ContactCapture";
 import { IconChat, IconClose, IconSend } from "./icons";
 
-const SUGGESTIONS = ["3BHK under 90L in Pune", "Pune mein 90 lakh tak 3BHK chahiye", "2 BHK near a metro"];
+const SUGGESTIONS = [
+  "3BHK under 90L in Pune",
+  "Pune mein 90 lakh tak 3BHK chahiye",
+  "पुण्यात 90 लाखांपर्यंत 3BHK हवा आहे",
+  "What's the payment plan at Aranya Courtyard?",
+];
 
 // Other parts of the page can open the assistant: window.dispatchEvent(new Event("leadops:open-chat"))
 export const openChat = () => window.dispatchEvent(new Event("leadops:open-chat"));
 
-function Message({ message }) {
+function EmiCard({ emi }) {
+  return (
+    <dl className="w-full rounded-md border border-line p-3 text-sm">
+      <div className="flex items-baseline justify-between gap-3">
+        <dt className="font-medium text-ink-soft">EMI a month</dt>
+        <dd className="tabular text-lg font-semibold">{formatRupees(emi.emi_inr)}</dd>
+      </div>
+      <div className="mt-1 flex items-baseline justify-between gap-3 text-muted">
+        <dt>Loan</dt>
+        <dd className="tabular">{formatPrice(emi.loan_inr)}</dd>
+      </div>
+      <div className="flex items-baseline justify-between gap-3 text-muted">
+        <dt>Rate and term</dt>
+        <dd className="tabular">
+          {emi.rate_pct}%, {emi.years} years
+        </dd>
+      </div>
+    </dl>
+  );
+}
+
+function Message({ message, language, onFormDone }) {
   const mine = message.role === "user";
   return (
     <li className={`flex flex-col gap-2 ${mine ? "items-end" : "items-start"}`}>
@@ -42,6 +69,8 @@ function Message({ message }) {
           ))}
         </ul>
       )}
+      {message.emi && <EmiCard emi={message.emi} />}
+      {message.action?.type === "contact_form" && <ContactCapture action={message.action} language={language} onDone={onFormDone} />}
     </li>
   );
 }
@@ -54,6 +83,7 @@ export default function ChatWidget() {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
+  const [language, setLanguage] = useState("en");
   const historyLoaded = useRef(false);
   const listRef = useRef(null);
   const inputRef = useRef(null);
@@ -91,12 +121,28 @@ export default function ChatWidget() {
     track("chat_message", { length: message.length, listing_id: listingId });
     try {
       const data = await sendChat(message, listingId);
-      setMessages((current) => [...current, { role: "assistant", text: data.reply, listings: data.listings }]);
+      setLanguage(data.profile?.language ?? "en");
+      setMessages((current) => [
+        ...current,
+        { role: "assistant", text: data.reply, listings: data.listings, emi: data.emi, action: data.action },
+      ]);
+      if (data.emi) {
+        const { listing_id, price_inr, down_payment_pct, rate_pct, years, emi_inr } = data.emi;
+        track("emi_used", { listing_id, price_inr, down_payment_pct, rate_pct, years, emi: emi_inr, via: "assistant" });
+      }
     } catch {
       setError("The assistant can't be reached right now. Try again in a moment.");
     } finally {
       setSending(false);
     }
+  }
+
+  // A form in the conversation was sent: it goes away and the assistant confirms.
+  function formDone(index, text) {
+    setMessages((current) => [
+      ...current.map((message, position) => (position === index ? { ...message, action: null } : message)),
+      { role: "assistant", text },
+    ]);
   }
 
   if (!open) {
@@ -132,7 +178,7 @@ export default function ChatWidget() {
       <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-4">
         {messages.length === 0 ? (
           <div className="flex flex-col gap-3 text-sm text-ink-soft">
-            <p>Tell me what you&apos;re looking for, in English or Hinglish. For example:</p>
+            <p>Tell me what you&apos;re looking for, in English, Hindi, Hinglish or Marathi. For example:</p>
             <div className="flex flex-col items-start gap-2">
               {SUGGESTIONS.map((suggestion) => (
                 <button
@@ -149,7 +195,7 @@ export default function ChatWidget() {
         ) : (
           <ul className="flex flex-col gap-4">
             {messages.map((message, index) => (
-              <Message key={index} message={message} />
+              <Message key={index} message={message} language={language} onFormDone={(text) => formDone(index, text)} />
             ))}
           </ul>
         )}

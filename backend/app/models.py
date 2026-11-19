@@ -6,9 +6,9 @@ label change (scoring engine) and Feedback holds sales verdicts (Week 3 feedback
 New columns on existing tables are added at startup by db.init_db(), so existing databases keep working.
 """
 
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import JSON, BigInteger, Boolean, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, BigInteger, Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -124,6 +124,23 @@ class Lead(Base):
     user_agent: Mapped[str | None] = mapped_column(Text)
     client_ts: Mapped[int | None] = mapped_column(BigInteger)
     status: Mapped[str] = mapped_column(String(20), default="new")
+    source: Mapped[str | None] = mapped_column(String(20))  # form / assistant_offer / chat (older rows: empty, a form)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+
+
+class SiteVisit(Base):
+    """A visitor's request to see a home, booked through the assistant or by the sales team."""
+
+    __tablename__ = "site_visits"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    visitor_id: Mapped[str] = mapped_column(ForeignKey("visitors.id"), index=True)
+    lead_id: Mapped[int | None] = mapped_column(ForeignKey("leads.id"))
+    listing_id: Mapped[str] = mapped_column(String(32))
+    day: Mapped[date] = mapped_column(Date)
+    slot: Mapped[str] = mapped_column(String(12), default="morning")  # morning / afternoon / evening
+    status: Mapped[str] = mapped_column(String(12), default="requested")  # requested / confirmed / done / cancelled
+    source: Mapped[str] = mapped_column(String(12), default="assistant")  # assistant / dashboard
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 

@@ -1,12 +1,14 @@
-"""Pick buyer details out of a chat message: patterns first (English, Hinglish and basic Hindi), then the LLM.
+"""Pick buyer details out of a chat message: patterns first (English, Hinglish, Hindi and Marathi), then the LLM.
 
     "3BHK under 90L in Pune?"            -> {"city": "Pune", "bhk": 3, "budget_max": 9000000, ...}
     "Pune mein 90 lakh tak 3BHK chahiye" -> the same
+    "पुण्यात 90 लाखांपर्यंत 3BHK हवा आहे"     -> the same
 
-smart_extract() runs the patterns and, when an LLM key is set, lets the LLM read the message with the last few
+read_message() runs the patterns and, when an LLM key is set, lets the LLM read the message with the last few
 turns ("same budget but in Bengaluru", "80-85 lakh ke beech", "teen BHK"). Every LLM value is checked before it is
 used, and any LLM failure falls back to the patterns. Output keys (all optional): city, locality, bhk, budget_min,
-budget_max (INR), timeline_months, loan_needed, purpose ("own_use" / "investment"), language ("en", "hinglish", "hi").
+budget_max (INR), timeline_months, loan_needed, purpose ("own_use" / "investment"),
+language ("en", "hinglish", "hi", "mr").
 """
 
 import logging
@@ -24,11 +26,11 @@ CRORE = 10_000_000
 MIN_BUDGET, MAX_BUDGET = 5 * LAKH, 100 * CRORE  # amounts outside this range aren't home budgets
 
 _CITY_ALIASES = {
-    "Pune": ["pune", "poona", "pcmc", "पुणे"],
-    "Bengaluru": ["bengaluru", "bangalore", "blr", "बेंगलुरु", "बेंगलुरू", "बैंगलोर"],
+    "Pune": ["pune", "poona", "pcmc", "पुणे", "पुण्या"],
+    "Bengaluru": ["bengaluru", "bangalore", "blr", "बेंगलुरु", "बेंगलुरू", "बैंगलोर", "बंगळुरू", "बेंगळुरू", "बंगळूर"],
     "Hyderabad": ["hyderabad", "hyd", "secunderabad", "हैदराबाद"],
     "Mumbai": ["mumbai", "bombay", "navi mumbai", "mmr", "मुंबई"],
-    "Noida": ["noida", "greater noida", "नोएडा"],
+    "Noida": ["noida", "greater noida", "नोएडा", "नोयडा"],
 }
 CITY_LOOKUP = {alias: city for city, aliases in _CITY_ALIASES.items() for alias in aliases}
 
@@ -47,15 +49,16 @@ LOCALITY_ALIASES = {
 _WORD_NUMBERS = {
     "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
     "ek": 1, "do": 2, "teen": 3, "char": 4, "chaar": 4, "paanch": 5,
+    "एक": 1, "दो": 2, "दोन": 2, "तीन": 3, "चार": 4, "पाच": 5, "पांच": 5, "पाँच": 5,
 }  # fmt: skip
 _BHK = re.compile(
-    r"(?<![\w.])([1-6]|one|two|three|four|five|ek|do|teen|chaa?r|paanch)\s*-?\s*"
+    r"(?<![\w.])([1-6]|one|two|three|four|five|ek|do|teen|chaa?r|paanch|एक|दोन|दो|तीन|चार|पाच|पांच|पाँच)\s*-?\s*"
     r"(?:bhk|b\.h\.k\.?|bed(?:room)?s?|br|बीएचके|बेडरूम)(?![a-z])"
 )
 _SECTOR = re.compile(r"\bsec(?:tor)?[\s-]*(\d{1,3})\b")
 
 _NUM = r"(\d+(?:\.\d+)?)"
-_UNIT = r"(lakhs?|lacs?|lkh|lk|l|crores?|crs?|karod|karor|लाख|करोड़|करोड)"
+_UNIT = r"(lakhs?|lacs?|lkh|lk|l|crores?|crs?|karod|karor|लाख|करोड़|करोड|कोटी|कोटि)"
 _AMOUNT = re.compile(rf"(?:₹|rs\.?|inr)?\s*{_NUM}\s*{_UNIT}(?![a-z])")
 _RANGE = re.compile(rf"{_NUM}\s*{_UNIT}?\s*(?:-|to|se|and)\s*{_NUM}\s*{_UNIT}(?![a-z])")
 # Full rupee amounts: "₹85,00,000", "rs 8500000", or Indian digit grouping "85,00,000".
@@ -63,29 +66,29 @@ _RUPEES = re.compile(r"(?:₹|rs\.?|inr|rupees)\s*(\d{1,3}(?:,\d{2,3})+|\d{6,9})
 
 _MIN_BEFORE = re.compile(r"(above|over|more than|min(?:imum)?|at ?least|starting(?: from)?|from|>)\s*$")
 _MAX_BEFORE = re.compile(r"(under|below|upto|up to|within|max(?:imum)?|less than|not more than|budget|around|about|approx(?:imately)?|<)\s*(?:is|of)?\s*$")
-_MIN_AFTER = re.compile(r"^\s*(se (?:upar|zyada|jyada|adhik)|or more|plus|\+|से ज़्यादा|से ऊपर)")
+_MIN_AFTER = re.compile(r"^\s*(se (?:upar|zyada|jyada|adhik)|or more|plus|\+|से ज़्यादा|से ऊपर|(?:ां)?पेक्षा (?:जास्त|वर))")
 _MAX_AFTER = re.compile(r"^\s*(tak|tk|ke andar|ke under|se kam|or less|max|तक|से कम)")
 
-_MONTHS = re.compile(r"(\d{1,2})\s*(?:months?|mnths?|mahine|mahino|mahina|महीने|महीनों|महीना)")
-_YEARS = re.compile(r"(\d|a|one|ek)\s*(?:years?|yrs?|saal|sal|साल)(?![a-z])")
-_SOON = re.compile(r"\b(?:immediately|asap|urgent(?:ly)?|right away|right now|turant|jaldi)\b|तुरंत|जल्दी")
-_NEXT_MONTH = re.compile(r"\bnext month\b|agle mahine|अगले महीने")
-_NEXT_YEAR = re.compile(r"\bnext year\b|agle saal|अगले साल")
-_LOAN_WORDS = re.compile(r"\b(?:emi|loan|tenure|interest)\b|लोन")
+_MONTHS = re.compile(r"(\d{1,2})\s*(?:months?|mnths?|mahine|mahino|mahina|महीने|महीनों|महीना|महिने|महिन्या|महिना)")
+_YEARS = re.compile(r"(\d|a|one|ek)\s*(?:years?|yrs?|saal|sal|साल|वर्ष)(?![a-z])")
+_SOON = re.compile(r"\b(?:immediately|asap|urgent(?:ly)?|right away|right now|turant|jaldi)\b|तुरंत|जल्दी|लगेच|ताबडतोब")
+_NEXT_MONTH = re.compile(r"\bnext month\b|agle mahine|अगले महीने|पुढच्या महिन्यात")
+_NEXT_YEAR = re.compile(r"\bnext year\b|agle saal|अगले साल|पुढच्या वर्षी")
+_LOAN_WORDS = re.compile(r"\b(?:emi|loan|tenure|interest)\b|लोन|कर्ज")
 
 _NO_LOAN = re.compile(
     r"\b(?:no loan|without (?:a |any )?loan|(?:don'?t|do not|won'?t) need (?:a |any )?loan|fully? (?:cash|payment)"
-    r"|cash (?:buyer|payment|down)|self[- ]funded|loan nahi[n]?|loan ki zarurat nahi)\b|लोन नहीं"
+    r"|cash (?:buyer|payment|down)|self[- ]funded|loan nahi[n]?|loan ki zarurat nahi|loan nako)\b|लोन नहीं|लोन नको|कर्ज नको|कर्ज नाही"
 )
-_LOAN = re.compile(r"\b(?:home loan|housing loan|loan|emi|finance|financing|mortgage)\b|लोन")
+_LOAN = re.compile(r"\b(?:home loan|housing loan|loan|emi|finance|financing|mortgage)\b|लोन|कर्ज")
 
 _INVESTMENT = re.compile(
     r"\b(?:invest(?:ment|ing)?|rental (?:income|yield)|roi|appreciation|resale value|rent (?:it )?out)\b"
-    r"|investment ke liye|nivesh|निवेश"
+    r"|investment ke liye|nivesh|निवेश|गुंतवणूक|गुंतवणुकीसाठी"
 )
 _OWN_USE = re.compile(
     r"\b(?:own use|self use|end use|to live in|for (?:my|our) family|live there|stay there|khud ke liye|apne liye"
-    r"|rehne ke liye)\b|रहने के लिए|अपने लिए|खुद के लिए"
+    r"|rehne ke liye)\b|रहने के लिए|अपने लिए|खुद के लिए|राहण्यासाठी|स्वतःसाठी"
 )
 
 _DEVANAGARI = re.compile(r"[ऀ-ॿ]")
@@ -93,11 +96,20 @@ _HINGLISH_WORDS = {
     "mein", "mujhe", "chahiye", "tak", "hai", "kya", "ka", "ki", "ke", "se", "aur", "nahi", "ghar", "lena",
     "kitna", "kitne", "wala", "wali", "hoga", "batao", "dikhao", "accha", "acha", "bhi", "koi", "kuch", "hum",
 }  # fmt: skip
+_MARATHI_ROMAN = {"mala", "pahije", "aahe", "ahe", "kiti", "madhe", "madhye", "hava", "havi", "kuthe", "ani", "nako", "sanga", "dakhva"}
+_MARATHI_WORDS = {
+    "आहे", "आहेत", "मला", "आम्हाला", "हवा", "हवे", "हवी", "पाहिजे", "किती", "कुठे", "आणि", "नको", "मध्ये", "सांगा", "दाखवा", "करा",
+    "कसे", "कोणते", "तुमच्याकडे", "घरे", "शोधत", "बजेट", "साठी",
+}  # fmt: skip
+_HINDI_WORDS = {
+    "है", "हैं", "मुझे", "हमें", "चाहिए", "में", "तक", "क्या", "कितना", "कितने", "कहाँ", "कहां", "और", "नहीं", "दिखाओ", "बताओ", "मैं", "का",
+    "की", "के", "से", "को",
+}  # fmt: skip
 
 
 def extract_details(message: str) -> dict:
     """Buyer details found in one message. Keys are only present when found (language is always set)."""
-    text = _normalise(message)
+    text = normalise(message)
     details: dict = {}
 
     locality = _find_locality(text)
@@ -126,7 +138,7 @@ def extract_details(message: str) -> dict:
 
 CITIES = list(_CITY_ALIASES)
 PURPOSES = ("own_use", "investment")
-LANGUAGES = ("en", "hinglish", "hi")
+LANGUAGES = ("en", "hinglish", "hi", "mr")
 
 EXTRACTION_SYSTEM = """\
 You read one message from a visitor on an Indian real estate website and pick out the home-buying details it states.
@@ -141,7 +153,7 @@ budget_max only; "80 to 90 lakh" sets both.
 - timeline_months: when they want to move in, in months ("immediately" = 1, "next year" = 12).
 - loan_needed: true if they need a home loan, false if they say they don't.
 - purpose: "own_use" to live in, "investment" to invest or rent out.
-- language: "en" (English), "hinglish" (Hindi in Roman script) or "hi" (Hindi in Devanagari).
+- language: "en" (English), "hinglish" (Hindi in Roman script), "hi" (Hindi in Devanagari) or "mr" (Marathi).
 "[phone]" and "[email]" are details hidden for privacy."""
 
 
@@ -184,7 +196,7 @@ def clean_details(raw: dict) -> dict:
         if city:
             found["city"] = city
     if isinstance(raw.get("locality"), str) and raw["locality"].strip():
-        if locality := _find_locality(_normalise(raw["locality"])):
+        if locality := _find_locality(normalise(raw["locality"])):
             found["locality"] = locality
             found["city"] = locality_index()[locality.casefold()].city  # the locality decides the city
     if (bhk := _whole(raw.get("bhk"))) is not None and 1 <= bhk <= 6:
@@ -205,35 +217,46 @@ def clean_details(raw: dict) -> dict:
     return found
 
 
-def extract_with_llm(message: str, history: list[str]) -> dict:
-    """The details the LLM finds in this message, checked. Phones and emails are masked first; raises LLMError."""
-    earlier = "\n".join(f"- {mask_pii(text)}" for text in history[-4:])
+def _ask_llm(message: str, history: list[str], extra_properties: dict | None, extra_help: str) -> dict:
+    """The LLM's answer about this message. Phones and emails are masked first; raises LLMError."""
+    earlier = "\n".join(f"- {mask_pii(item)}" for item in history[-4:])
     content = (f"<earlier_messages>\n{earlier}\n</earlier_messages>\n\n" if earlier else "") + (
         f"<latest_message>\n{mask_pii(message)}\n</latest_message>"
     )
-    raw = llm.generate_json(EXTRACTION_SYSTEM, [{"role": "user", "content": content}], EXTRACTION_SCHEMA, max_tokens=512)
-    return clean_details(raw)
+    schema, system = EXTRACTION_SCHEMA, EXTRACTION_SYSTEM
+    if extra_properties:
+        schema = {**EXTRACTION_SCHEMA, "properties": {**EXTRACTION_SCHEMA["properties"], **extra_properties},
+                  "required": [*EXTRACTION_SCHEMA["required"], *extra_properties]}  # fmt: skip
+        system = f"{EXTRACTION_SYSTEM}\n\n{extra_help}"
+    return llm.generate_json(system, [{"role": "user", "content": content}], schema, max_tokens=512)
 
 
-def smart_extract(message: str, history: list[str] | None = None) -> dict:
-    """The patterns' details, improved by the LLM when a key is set. history: the visitor's earlier messages."""
-    found = extract_details(message)
-    if not llm.available():
-        return found
-    try:
-        from_llm = extract_with_llm(message, history or [])
-    except LLMError as exc:
-        log.warning("LLM extraction failed, using the patterns only: %s", exc)
-        return found
-    merged = {**found, **from_llm}  # the LLM wins where it found something; a null never erases a pattern's find
+def combine_details(found: dict, from_llm: dict, message: str) -> dict:
+    """The LLM wins where it found something; a null never erases what the patterns found."""
+    merged = {**found, **from_llm}
     if "budget_min" in from_llm or "budget_max" in from_llm:  # never mix one extractor's minimum with the other's maximum
         for key in ("budget_min", "budget_max"):
             merged.pop(key, None)
             if key in from_llm:
                 merged[key] = from_llm[key]
     if _DEVANAGARI.search(message):
-        merged["language"] = "hi"
+        merged["language"] = detect_language(message)
     return merged
+
+
+def read_message(message: str, history: list[str] | None = None, *, extra_properties: dict | None = None,
+                 extra_help: str = "") -> tuple[dict, dict]:
+    """(the buyer details in this message, the LLM's raw answer). The patterns always run; with a key the LLM reads the
+    message too, along with the visitor's earlier messages. extra_properties ask the same LLM call for more fields."""
+    found = extract_details(message)
+    if not llm.available():
+        return found, {}
+    try:
+        raw = _ask_llm(message, history or [], extra_properties, extra_help)
+    except LLMError as exc:
+        log.warning("LLM extraction failed, using the patterns only: %s", exc)
+        return found, {}
+    return combine_details(found, clean_details(raw), message), raw
 
 
 def merge_profile(profile: dict, found: dict) -> dict:
@@ -257,14 +280,22 @@ def profile_from_messages(messages: list[str]) -> dict:
 
 
 def detect_language(message: str) -> str:
-    if _DEVANAGARI.search(message):
-        return "hi"
+    if _DEVANAGARI.search(message):  # Hindi and Marathi share a script: count each language's everyday words
+        words = re.findall(r"[ऀ-ॿ]+", message)
+        marathi = sum(word in _MARATHI_WORDS for word in words) + sum(word.endswith(("ात", "ांपर्यंत", "ामध्ये")) for word in words)
+        return "mr" if marathi > sum(word in _HINDI_WORDS for word in words) else "hi"
     words = set(re.findall(r"[a-z]+", message.casefold()))
+    if len(words & _MARATHI_ROMAN) >= 2 and len(words & _MARATHI_ROMAN) > len(words & _HINGLISH_WORDS):
+        return "mr"
     return "hinglish" if len(words & _HINGLISH_WORDS) >= 2 else "en"
 
 
-def _normalise(message: str) -> str:
-    text = message.casefold().replace("–", "-").replace("—", "-").replace("₹", " ₹")
+_DEVANAGARI_DIGITS = str.maketrans("०१२३४५६७८९", "0123456789")
+
+
+def normalise(message: str) -> str:
+    """Lower case, plain dashes and digits, single spaces: what every pattern here expects."""
+    text = message.translate(_DEVANAGARI_DIGITS).casefold().replace("–", "-").replace("—", "-").replace("₹", " ₹")
     return re.sub(r"\s+", " ", text).strip()
 
 
@@ -304,7 +335,7 @@ def _find_bhk(text: str) -> int | None:
 
 def _to_inr(number: str, unit: str | None) -> int:
     value = float(number)
-    if unit and (unit.startswith(("c", "k")) or unit.startswith("कर")):
+    if unit and (unit.startswith(("c", "k")) or unit.startswith(("कर", "को"))):
         return round(value * CRORE)
     return round(value * LAKH)
 

@@ -12,8 +12,10 @@ The label, in this order (LEADOPS_PLAN.md, Week 2 Part 3):
 
 import math
 from dataclasses import dataclass, field
+from datetime import date
 
-from ..listings import format_price
+from ..listings import format_price, get_listing
+from ..utils import short_day
 from .explain import human_factors, reasons_for, summary_line
 from .features import visitor_features
 from .model import HumanCheck, HumanModel, current_model
@@ -143,6 +145,10 @@ def intent_points(record: dict, f: dict, signals: list[Signal]) -> list[IntentPo
     add("focused_search", focus, "Looked at homes in one city and price range" if focus >= 10 else "Kept to a few similar homes")
     if f["filters_used"]:
         add("filters", 6, "Searched with the filters")
+    if visits := record.get("site_visits"):  # the strongest buying signal there is
+        visit, home = visits[-1], get_listing(visits[-1]["listing_id"])
+        add("site_visit", 15, f"Asked for a site visit to {home.project if home else visit['listing_id']} on "
+                              f"{short_day(date.fromisoformat(visit['day']))}, {visit['slot']}")
     return points
 
 

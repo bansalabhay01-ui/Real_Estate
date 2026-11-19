@@ -6,6 +6,7 @@ import { IntentMeter, LabelBadge, LeadChecks, shortId, SignalChips } from "../da
 import SimulateTraffic from "../dashboard/SimulateTraffic";
 import { useDashboardFeed, useFilteredVisitors } from "../dashboard/useDashboardFeed";
 import VisitorDetail from "../dashboard/VisitorDetail";
+import { updateVisit } from "../lib/api";
 import { profilePhrases, timeAgo } from "../lib/format";
 
 const STATUS = {
@@ -220,6 +221,67 @@ function LeadsTable({ leads, onSelect, now }) {
   );
 }
 
+const VISIT_NEXT = {
+  requested: [["confirmed", "Confirm"], ["cancelled", "Cancel"]],
+  confirmed: [["done", "Mark done"], ["cancelled", "Cancel"]],
+  done: [],
+  cancelled: [],
+};
+
+function VisitsTable({ visits, onSelect }) {
+  const shown = visits.filter((visit) => visit.status !== "cancelled");
+  if (shown.length === 0) {
+    return <p className="px-4 py-6 text-sm text-muted">No site visits yet. Buyers can book one through the assistant.</p>;
+  }
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[640px] text-left text-sm">
+        <thead className="border-b border-line text-muted">
+          <tr>
+            <th scope="col" className={th}>When</th>
+            <th scope="col" className={th}>Home</th>
+            <th scope="col" className={th}>Buyer</th>
+            <th scope="col" className={th}>Status</th>
+            <th scope="col" className={th}><span className="sr-only">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {shown.map((visit) => (
+            <tr key={visit.id} className="border-b border-line/70 align-top last:border-0">
+              <td className={`${td} whitespace-nowrap font-medium`}>
+                {visit.day_text}, {visit.slot}
+              </td>
+              <td className={td}>
+                {visit.project}
+                <div className="text-xs text-muted">{visit.locality}, {visit.city}</div>
+              </td>
+              <td className={td}>
+                <button type="button" onClick={() => onSelect(visit.visitor_id)} className="font-semibold text-blueprint hover:underline">
+                  {visit.name ?? shortId(visit.visitor_id)}
+                </button>
+                <div className="tabular text-xs text-muted">{visit.phone}</div>
+              </td>
+              <td className={`${td} capitalize`}>{visit.status}</td>
+              <td className={`${td} whitespace-nowrap text-right`}>
+                {VISIT_NEXT[visit.status]?.map(([status, text]) => (
+                  <button
+                    key={status}
+                    type="button"
+                    onClick={() => updateVisit(visit.id, { status }).catch(() => {})}
+                    className="ml-1.5 rounded border border-line px-2 py-1 text-xs font-medium hover:bg-concrete"
+                  >
+                    {text}
+                  </button>
+                ))}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // A short alert when someone turns Hot: the newest one, with how many more arrived at the same time.
 function HotAlert({ alerts, onView, onDismiss }) {
   const [latest, ...others] = alerts;
@@ -269,7 +331,7 @@ function HotAlert({ alerts, onView, onDismiss }) {
 }
 
 export default function Dashboard() {
-  const { visitors, leads, updatedAt, status, stats, hotAlerts, dismissHotAlert, demo } = useDashboardFeed();
+  const { visitors, leads, updatedAt, status, stats, hotAlerts, dismissHotAlert, demo, visits } = useDashboardFeed();
   const [selectedId, setSelectedId] = useState(null);
   const [now, setNow] = useState(() => Date.now());
   const [filter, setFilter] = useState("All");
@@ -343,6 +405,9 @@ export default function Dashboard() {
                 onSelect={setSelectedId}
                 now={now}
               />
+            </Panel>
+            <Panel id="visits-heading" title="Site visits" note="Soonest first">
+              <VisitsTable visits={visits} onSelect={setSelectedId} />
             </Panel>
             <Panel id="leads-heading" title="Enquiries" note="Newest first">
               <LeadsTable leads={leads} onSelect={setSelectedId} now={now} />

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getDemoStatus, getStats, getVisitors } from "../lib/api";
+import { getDemoStatus, getStats, getVisitors, getVisits } from "../lib/api";
 import { WS_URL } from "../lib/config";
 
 const MAX_VISITORS = 500;
@@ -16,6 +16,7 @@ export function useDashboardFeed() {
   const [stats, setStats] = useState(null);
   const [hotAlerts, setHotAlerts] = useState([]); // visitors who just turned Hot, newest first
   const [demo, setDemo] = useState(null); // the live demo tools: simulated run, scoreboard, real bot
+  const [visits, setVisits] = useState([]); // site visits, soonest first
   const statsLoadedAt = useRef(0);
 
   const loadStats = useCallback(() => {
@@ -24,6 +25,13 @@ export function useDashboardFeed() {
       .then(setStats)
       .catch(() => {});
   }, []);
+  const loadVisits = useCallback(
+    () =>
+      getVisits()
+        .then(setVisits)
+        .catch(() => {}),
+    [],
+  );
   const refreshDemo = useCallback(
     () =>
       getDemoStatus()
@@ -44,6 +52,7 @@ export function useDashboardFeed() {
         attempts = 0;
         setStatus("live");
         refreshDemo();
+        loadVisits();
       };
       socket.onmessage = (event) => {
         const message = JSON.parse(event.data);
@@ -66,6 +75,8 @@ export function useDashboardFeed() {
             const alert = { visitorId: message.visitor_id, reason: message.reasons?.[0] ?? "", at: Date.now() };
             setHotAlerts((current) => [alert, ...current.filter((item) => item.visitorId !== alert.visitorId)].slice(0, 20));
           }
+        } else if (message.type === "visit_booked" || message.type === "visit_updated") {
+          loadVisits();
         } else if (message.type === "simulation_started") {
           setDemo((current) => ({ ...current, running: true, sent: 0, total: message.total, labels: {}, scoreboard: null }));
         } else if (message.type === "simulation_progress") {
@@ -96,7 +107,7 @@ export function useDashboardFeed() {
       clearTimeout(retryTimer);
       socket?.close();
     };
-  }, [loadStats, refreshDemo]);
+  }, [loadStats, loadVisits, refreshDemo]);
 
   // Headline numbers come from the API (the list only holds recent visitors).
   useEffect(() => {
@@ -110,7 +121,7 @@ export function useDashboardFeed() {
     [],
   );
 
-  return { visitors, leads, updatedAt, status, stats, hotAlerts, dismissHotAlert, demo };
+  return { visitors, leads, updatedAt, status, stats, hotAlerts, dismissHotAlert, demo, visits };
 }
 
 const byRecent = (a, b) => Date.parse(b.last_seen) - Date.parse(a.last_seen);

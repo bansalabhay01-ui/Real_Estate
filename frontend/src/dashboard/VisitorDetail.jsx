@@ -7,7 +7,7 @@ import ScoreBreakdown from "./ScoreBreakdown";
 import { LabelBadge, LeadChecks, shortId, SignalChips } from "./Signals";
 
 const TIMELINE_LIMIT = 60;
-const LANGUAGES = { en: "English", hinglish: "Hinglish", hi: "Hindi" };
+const LANGUAGES = { en: "English", hinglish: "Hinglish", hi: "Hindi", mr: "Marathi" };
 
 function Section({ title, children }) {
   return (
@@ -88,7 +88,7 @@ export default function VisitorDetail({ visitorId, version, onClose }) {
     return <aside className={`${panelClass} text-sm text-muted`}>Loading the visitor...</aside>;
   }
 
-  const { visitor, events, leads, chat, context, user_agent: userAgent, score_detail: scoreDetail } = detail;
+  const { visitor, events, leads, chat, site_visits: visits = [], context, user_agent: userAgent, score_detail: scoreDetail } = detail;
   return (
     <aside
       aria-labelledby="visitor-heading"
@@ -120,6 +120,19 @@ export default function VisitorDetail({ visitorId, version, onClose }) {
       <Section title="Buyer details from chat">
         <BuyerDetails profile={visitor.profile} />
       </Section>
+
+      {visits.length > 0 && (
+        <Section title="Site visits">
+          <ul className="flex flex-col gap-1.5 text-sm">
+            {visits.map((visit) => (
+              <li key={visit.id}>
+                <span className="font-semibold">{visit.project}</span>, {visit.day_text}, {visit.slot}{" "}
+                <span className="text-muted">({visit.status})</span>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
 
       {leads.length > 0 && (
         <Section title="Enquiries">

@@ -38,8 +38,9 @@ def _keywords(text: str) -> set[str]:
 
 
 def _keyword_score(item: Listing, keywords: set[str]) -> int:
-    haystack = search_text(item)
-    return sum(1 for word in keywords if word in haystack)
+    """How many of the words start a word in this listing ("metro" finds "metros", but "emi" doesn't find "premium")."""
+    words = set(re.findall(r"[a-z0-9]+", search_text(item)))
+    return sum(1 for keyword in keywords if any(word.startswith(keyword) for word in words))
 
 
 def _rank(items: list[Listing], keywords: set[str], budget_max: int | None) -> list[Listing]:

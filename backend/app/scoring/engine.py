@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from ..ai.classify import classify
 from ..db import SessionLocal
-from ..models import ChatMessage, Event, Lead, Score, Visitor, VisitSession
+from ..models import ChatMessage, Event, Lead, Score, SiteVisit, Visitor, VisitSession
 from ..realtime import hub
 from ..schemas import VisitorOut
 from ..tracking import list_leads, list_visitors, visitor_out
@@ -195,6 +195,7 @@ def load_record(db: Session, visitor_id: str) -> dict | None:
     chat = db.scalars(
         select(ChatMessage).where(ChatMessage.visitor_id == visitor_id, ChatMessage.role == "user").order_by(ChatMessage.id)
     ).all()
+    visits = db.scalars(select(SiteVisit).where(SiteVisit.visitor_id == visitor_id, SiteVisit.status != "cancelled").order_by(SiteVisit.id)).all()
     record = {
         "visitor_id": visitor.id,
         "user_agent": visitor.user_agent,
@@ -211,6 +212,7 @@ def load_record(db: Session, visitor_id: str) -> dict | None:
         ],  # fmt: skip
         "chat": [{"session_id": row.session_id, "text": row.text, "ts": _ms(row.created_at)} for row in chat],
         "profile": visitor.profile or {},
+        "site_visits": [{"listing_id": row.listing_id, "day": row.day.isoformat(), "slot": row.slot, "status": row.status} for row in visits],
     }
     record["network"] = network_counts(db, record, anchor=visitor.last_seen)
     return record

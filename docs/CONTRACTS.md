@@ -94,6 +94,8 @@ Response `201`: `{"ok": true, "lead_id": 12}`.
 - **form_fill_ms**: from the first touch of the form to submit. `0` means the form was sent without typing.
 - **Never reject bot-looking enquiries.** Save them and answer as usual, so scoring can label them and bots
   get no hint. An enquiry without a `visitor_id` (an API call with no browsing) gets a `nosdk-...` visitor.
+- **source** (optional): where the enquiry came from: `form` (the default), `assistant_offer` or `chat`. An unknown
+  value is dropped, never rejected. `LeadOut` always has it.
 - `LeadOut` (in `GET /leads` and the WebSocket) adds `label` (the visitor's current label, or `null`) and
   `checks`: `[{"check": "phone", "ok": false, "text": "Phone: the same digit over and over"}, ...]` for `phone`,
   `email`, `name`, `message`, `honeypot` and `fill_time` (only the ones that apply).
@@ -109,15 +111,35 @@ Request: `{"visitor_id": "...", "session_id": "...", "message": "3BHK under 90L 
   "listings": [{"id": "PUN-003", "project": "Indigo Greens", "...": "..."}],
   "extracted": {"city": "Pune", "bhk": 3, "budget_max": 9000000, "language": "en"},
   "profile": {"city": "Pune", "bhk": 3, "budget_max": 9000000, "language": "en"},
-  "mode": "template"
+  "mode": "template",
+  "action": null,
+  "emi": null
 }
 ```
 
 - **extracted**: details found in this message; **profile**: everything known so far (saved on the visitor).
 - Buyer detail keys: `city`, `locality`, `bhk`, `budget_min`, `budget_max` (INR), `timeline_months`,
-  `loan_needed` (true/false), `purpose` (`own_use` / `investment`), `language` (`en` / `hinglish` / `hi`). With an
-  LLM key, the LLM extraction fills the same keys; every value is checked before it is saved.
+  `loan_needed` (true/false), `purpose` (`own_use` / `investment`), `language` (`en` / `hinglish` / `hi` / `mr`). With
+  an LLM key, the LLM extraction fills the same keys; every value is checked before it is saved. `call_requested`
+  (true) appears when the visitor asks for a call back.
 - **mode**: `llm` when an LLM wrote the reply, `template` without a key or when the LLM call failed.
+- **emi** (optional): an EMI worked out for this message, with the EMI calculator's formula: `{listing_id, project,
+  price_inr, down_payment_pct, loan_inr, rate_pct, years, emi_inr, total_interest_inr}`.
+- **action** (optional): what the chat widget shows under the reply. `{"type": "contact_form", "purpose": "site_visit" /
+  "callback", "listing_id", "project", "need_contact", "day", "slot"}` asks for what is missing in a form, so phone
+  numbers are never typed into the chat; `{"type": "visit_booked", "visit": VisitOut, ...}` confirms a booking.
+
+### Site visits: `POST /visits`
+
+Request: `{"visitor_id", "session_id", "listing_id": "PUN-002", "day": "2026-11-21", "slot": "morning", "language": "en"}`.
+`slot` is `morning`, `afternoon` or `evening`; `source` is `assistant` (the default) or `dashboard`. A visitor who hasn't
+left contact details also sends `name`, `phone`, `consent: true` (plus `honeypot` and `form_fill_ms`), which become an
+enquiry with `source: "chat"`. Asking again for the same home and day changes the slot.
+
+Response `201`, a `VisitOut`: `{id, visitor_id, lead_id, listing_id, project, locality, city, day, day_text: "Sat 21 Nov",
+slot, status, source, name, phone, created_at, confirmation}`. `status` is `requested`, `confirmed`, `done` or
+`cancelled`. `confirmation` is a sentence for the visitor in their language. `422` when details are missing or the day
+is outside the next 60 days, `404` for an unknown home.
 
 ## 4. Routes
 
@@ -132,6 +154,7 @@ Request: `{"visitor_id": "...", "session_id": "...", "message": "3BHK under 90L 
 | `GET /listings/{id}` | one listing | B |
 | `POST /leads`, `GET /leads`, `GET /leads/{id}` | enquiries | B |
 | `POST /chat`, `GET /chat/{visitor_id}` | the assistant and a visitor's conversation | C |
+| `POST /visits`, `GET /visits?status=&limit=`, `PATCH /visits/{id}` | site visits, soonest first; `PATCH` takes `{status, day, slot}` | B |
 | `POST /feedback`, `GET /feedback` | sales verdicts: `genuine` / `fake` / `converted` | B |
 | `WS /ws/dashboard` | live dashboard feed | B |
 | `POST /demo/simulate` | `{bots, junk, genuine, seconds, seed}` (defaults 200 / 30 / 20 over 30 s): send simulated traffic through the real ingestion code. `202 {"ok": true, "run_id": "...", "total": 250, "seconds": 30}`, `409` while a run is going | B |
@@ -157,6 +180,8 @@ Then, as things happen:
 {"type": "score_update", "visitor_id": "...", "label": "Hot", "previous_label": "Warm", "intent_score": 82,
  "human_prob": 0.99, "visitor_type": null, "reasons": ["3 visits over 2 days", "..."]}
 ```
+
+Site visits add `{"type": "visit_booked", "visit": VisitOut}` and `{"type": "visit_updated", "visit": VisitOut}`.
 
 The live demo tools add:
 
@@ -201,6 +226,10 @@ Build Plan, and `backend/app/scoring/combine.py`).
   important first. **visitor_type**: `end_buyer` / `investor` / `tenant` / `broker` / `spam` once the visitor's
   enquiry messages and chat have been classified (in the background, by the LLM or keyword rules), otherwise
   `null`. A confident (0.7+) broker, spam or tenant is `Junk`, or `Review` with intent 70+.
+
+Intent points: time on property pages (up to 20), repeat visits (up to 15), details shared with the assistant (up to
+15), EMI calculator (12), floor plan (12), a valid enquiry (10), a focused search (up to 10), filters (6) and a requested
+site visit (15), capped at 100. `VisitorDetailOut` also lists the visitor's `site_visits`.
 
 `VisitorDetailOut.score_detail` (only in `GET /visitors/{id}`):
 

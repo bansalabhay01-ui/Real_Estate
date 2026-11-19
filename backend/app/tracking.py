@@ -1,8 +1,9 @@
 """Saving what visitors do (events, enquiries) and reading it back for the dashboard."""
 
+import time
 import uuid
 from collections.abc import Callable
-from datetime import timedelta
+from datetime import date, timedelta
 from typing import TypeVar
 
 from pydantic import ValidationError
@@ -11,7 +12,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .db import SessionLocal
-from .models import ChatMessage, Event, Lead, Visitor, VisitSession
+from .listings import get_listing
+from .models import ChatMessage, Event, Lead, SiteVisit, Visitor, VisitSession
 from .schemas import (
     ChatMessageOut,
     EventBatchIn,
@@ -22,13 +24,17 @@ from .schemas import (
     ScoreOut,
     SessionOut,
     StatsOut,
+    VisitIn,
+    VisitOut,
     VisitorDetailOut,
     VisitorOut,
+    VisitUpdate,
 )
-from .scoring.rules import lead_checks
-from .utils import automation_hints, device_from_ua, utcnow
+from .scoring.rules import check_phone, lead_checks
+from .utils import automation_hints, device_from_ua, short_day, today_ist, utcnow
 
 DETAIL_EVENT_LIMIT = 200
+MAX_VISIT_DAYS = 60  # how far ahead a site visit can be booked
 T = TypeVar("T")
 
 
@@ -59,7 +65,7 @@ def lead_out(lead: Lead, label: str | None = None) -> LeadOut:
     fields = {"phone": lead.phone, "email": lead.email, "name": lead.name, "message": lead.message,
               "honeypot": lead.honeypot, "form_fill_ms": lead.form_fill_ms}
     checks = [LeadCheckOut(**check) for check in lead_checks(fields)]
-    return LeadOut.model_validate(lead).model_copy(update={"label": label, "checks": checks})
+    return LeadOut.model_validate(lead).model_copy(update={"label": label, "checks": checks, "source": lead.source or "form"})
 
 
 def visitor_out(visitor: Visitor) -> VisitorOut:
@@ -176,6 +182,7 @@ def store_lead(payload: LeadIn, ip: str | None, user_agent: str | None) -> tuple
             user_agent=user_agent,
             client_ts=payload.client_ts,
             status="new",
+            source=payload.source or "form",
             created_at=now,
         )
         db.add(lead)
@@ -222,8 +229,111 @@ def visitor_detail(visitor_id: str) -> VisitorDetailOut | None:
             events=[EventOut.model_validate(row) for row in events],
             leads=[lead_out(row, visitor.label) for row in leads],
             chat=[ChatMessageOut.model_validate(row) for row in chat],
+            site_visits=_visits_of(db, visitor_id),
             score_detail=(visitor.score or {}).get("detail"),
         )
+
+
+# ---------------------------------------------------------------- site visits
+
+
+class VisitProblem(Exception):
+    """A site-visit request that can't be booked: the status code and a sentence for the visitor."""
+
+    def __init__(self, status: int, detail: str):
+        super().__init__(detail)
+        self.status, self.detail = status, detail
+
+
+def visit_out(visit: SiteVisit, lead: Lead | None) -> VisitOut:
+    home = get_listing(visit.listing_id)
+    return VisitOut(
+        id=visit.id, visitor_id=visit.visitor_id, lead_id=visit.lead_id, listing_id=visit.listing_id,
+        project=home.project if home else visit.listing_id, locality=home.locality if home else "", city=home.city if home else "",
+        day=visit.day, day_text=short_day(visit.day), slot=visit.slot, status=visit.status, source=visit.source,
+        name=lead.name if lead else None, phone=lead.phone if lead else None, created_at=visit.created_at,
+    )  # fmt: skip
+
+
+def _visits_of(db: Session, visitor_id: str) -> list[VisitOut]:
+    rows = db.scalars(select(SiteVisit).where(SiteVisit.visitor_id == visitor_id).order_by(SiteVisit.id.desc())).all()
+    return [visit_out(row, db.get(Lead, row.lead_id) if row.lead_id else None) for row in rows]
+
+
+def contact_lead_id(visitor_id: str | None) -> int | None:
+    """The visitor's latest enquiry with a real-looking number, if they have left one."""
+    if not visitor_id:
+        return None
+    with SessionLocal() as db:
+        leads = db.scalars(select(Lead).where(Lead.visitor_id == visitor_id).order_by(Lead.id.desc())).all()
+        return next((lead.id for lead in leads if check_phone(lead.phone).kind in ("mobile", "international")), None)
+
+
+def save_site_visit(visitor_id: str, lead_id: int | None, listing_id: str, day: date, slot: str, source: str) -> VisitOut:
+    """Book a visit. Asking again for the same home and day changes the slot instead of booking twice."""
+
+    def work(db: Session) -> VisitOut:
+        visit = db.scalar(select(SiteVisit).where(
+            SiteVisit.visitor_id == visitor_id, SiteVisit.listing_id == listing_id, SiteVisit.day == day, SiteVisit.status != "cancelled",
+        ))  # fmt: skip
+        if visit is None:
+            visit = SiteVisit(visitor_id=visitor_id, lead_id=lead_id, listing_id=listing_id, day=day, slot=slot, status="requested",
+                              source=source, created_at=utcnow())  # fmt: skip
+            db.add(visit)
+        else:
+            visit.slot = slot
+        visitor = db.get(Visitor, visitor_id)
+        if visitor is not None:
+            visitor.last_seen = utcnow()
+        db.commit()
+        return visit_out(visit, db.get(Lead, visit.lead_id) if visit.lead_id else None)
+
+    return run_in_session(work)
+
+
+def request_visit(payload: VisitIn, ip: str | None, user_agent: str | None) -> tuple[VisitOut, LeadOut | None]:
+    """A visit from the chat widget or the dashboard. New contact details become an enquiry first."""
+    home = get_listing(payload.listing_id)
+    if home is None:
+        raise VisitProblem(404, "We couldn't find that home")
+    today = today_ist()
+    if not today <= payload.day <= today + timedelta(days=MAX_VISIT_DAYS):
+        raise VisitProblem(422, f"Pick a day in the next {MAX_VISIT_DAYS} days")
+    lead_id = contact_lead_id(payload.visitor_id)
+    new_lead = None
+    visitor_id = payload.visitor_id
+    if lead_id is None:
+        if not (payload.name or "").strip() or not (payload.phone or "").strip():
+            raise VisitProblem(422, "We need your name and mobile number to book the visit")
+        if not payload.consent:
+            raise VisitProblem(422, "Please agree to be contacted about this visit")
+        details = LeadIn(
+            visitor_id=payload.visitor_id, session_id=payload.session_id, listing_id=home.id, name=payload.name.strip(),
+            phone=payload.phone.strip(), email=payload.email, message=f"Asked for a site visit to {home.project}", consent=True,
+            honeypot=payload.honeypot, form_fill_ms=payload.form_fill_ms, client_ts=int(time.time() * 1000), source="chat",
+        )  # fmt: skip
+        new_lead, _ = store_lead(details, ip, user_agent)
+        visitor_id, lead_id = new_lead.visitor_id, new_lead.id
+    return save_site_visit(visitor_id, lead_id, home.id, payload.day, payload.slot, payload.source), new_lead
+
+
+def list_site_visits(limit: int = 50, status: str | None = None) -> list[VisitOut]:
+    query = select(SiteVisit).order_by(SiteVisit.day, SiteVisit.id.desc())
+    if status:
+        query = query.where(SiteVisit.status == status)
+    with SessionLocal() as db:
+        return [visit_out(row, db.get(Lead, row.lead_id) if row.lead_id else None) for row in db.scalars(query.limit(limit))]
+
+
+def update_site_visit(visit_id: int, change: VisitUpdate) -> VisitOut | None:
+    with SessionLocal() as db:
+        visit = db.get(SiteVisit, visit_id)
+        if visit is None:
+            return None
+        for key, value in change.model_dump(exclude_none=True).items():
+            setattr(visit, key, value)
+        db.commit()
+        return visit_out(visit, db.get(Lead, visit.lead_id) if visit.lead_id else None)
 
 
 def dashboard_stats(active_minutes: int = 2) -> StatsOut:

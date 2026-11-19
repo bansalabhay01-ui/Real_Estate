@@ -55,6 +55,30 @@ def locality_index() -> dict[str, Listing]:
     return {item.locality.casefold(): item for item in all_listings()}
 
 
+def format_rupees(amount: float) -> str:
+    """Indian digit grouping: 52345 -> '₹52,345', 1234567 -> '₹12,34,567'."""
+    digits = str(int(round(amount)))
+    if len(digits) <= 3:
+        return f"₹{digits}"
+    head, groups = digits[:-3], [digits[-3:]]
+    while head:
+        groups.insert(0, head[-2:])
+        head = head[:-2]
+    return "₹" + ",".join(groups)
+
+
+def monthly_emi(principal: float, annual_rate_pct: float, years: int) -> float:
+    """The EMI calculator's formula: P x r x (1 + r)^n / ((1 + r)^n - 1), r the monthly rate, n the months."""
+    months = years * 12
+    if principal <= 0 or months <= 0:
+        return 0.0
+    rate = annual_rate_pct / 12 / 100
+    if rate == 0:
+        return principal / months
+    growth = (1 + rate) ** months
+    return principal * rate * growth / (growth - 1)
+
+
 def format_price(inr: int) -> str:
     """Indian style: 8600000 -> '₹86 L', 14500000 -> '₹1.45 Cr'."""
     if inr >= CRORE:

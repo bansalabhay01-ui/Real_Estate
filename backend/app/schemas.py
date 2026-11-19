@@ -5,7 +5,7 @@ whole team's agreement. Live docs for every route: http://localhost:8000/docs
 """
 
 import re
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, Any, Literal
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, PlainSerializer, field_validator, model_validator
@@ -18,6 +18,7 @@ UTCDateTime = Annotated[datetime, PlainSerializer(iso, return_type=str)]
 ClientId = Annotated[str, Field(min_length=8, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")]
 
 TEST_LABELS = ("genuine", "junk", "bot")  # what a tester link can mark a visit as
+LEAD_SOURCES = ("form", "assistant_offer", "chat")  # where an enquiry came from
 
 
 def _clip(limit: int) -> AfterValidator:
@@ -210,6 +211,13 @@ class LeadIn(BaseModel):
     form_fill_ms: int | None = Field(None, ge=0)  # first touch of the form until submit
     client_ts: int | None = None
     page_url: Annotated[str | None, _clip(2000)] = None
+    source: str | None = None  # form (the default) / assistant_offer / chat
+
+    @field_validator("source", mode="before")
+    @classmethod
+    def _known_source(cls, value: Any) -> str | None:
+        """An unknown source is dropped rather than rejected, so a site's typo never loses an enquiry."""
+        return value if value in LEAD_SOURCES else None
 
 
 class LeadAccepted(BaseModel):
@@ -245,6 +253,53 @@ class LeadOut(BaseModel):
     created_at: UTCDateTime
     label: str | None = None  # the visitor's current label
     checks: list[LeadCheckOut] = []
+    source: str | None = "form"  # form / assistant_offer / chat
+
+
+# ---------------------------------------------------------------- site visits -> POST /visits
+
+
+class VisitIn(BaseModel):
+    """A site-visit request. Someone who hasn't left contact details yet sends them here too."""
+
+    visitor_id: ClientId | None = None
+    session_id: ClientId | None = None
+    listing_id: Annotated[str, Field(min_length=1), _clip(32)]
+    day: date
+    slot: Literal["morning", "afternoon", "evening"] = "morning"
+    source: Literal["assistant", "dashboard"] = "assistant"
+    language: Annotated[str | None, _clip(10)] = None  # the language of the confirmation message
+    name: Annotated[str | None, _clip(100)] = None
+    phone: Annotated[str | None, _clip(32)] = None
+    email: Annotated[str | None, _clip(200)] = None
+    consent: bool = False
+    honeypot: Annotated[str | None, _clip(500)] = None
+    form_fill_ms: int | None = Field(None, ge=0)
+
+
+class VisitUpdate(BaseModel):
+    status: Literal["requested", "confirmed", "done", "cancelled"] | None = None
+    day: date | None = None
+    slot: Literal["morning", "afternoon", "evening"] | None = None
+
+
+class VisitOut(BaseModel):
+    id: int
+    visitor_id: str
+    lead_id: int | None
+    listing_id: str
+    project: str
+    locality: str
+    city: str
+    day: date
+    day_text: str  # "Sat 21 Nov"
+    slot: str
+    status: str
+    source: str
+    name: str | None = None  # from the visitor's enquiry
+    phone: str | None = None
+    created_at: UTCDateTime
+    confirmation: str | None = None  # a line for the visitor, in their language
 
 
 # ---------------------------------------------------------------- property assistant -> POST /chat
@@ -257,12 +312,41 @@ class ChatIn(BaseModel):
     listing_id: Annotated[str | None, _clip(32)] = None  # the property page the visitor is on, if any
 
 
+class EmiOut(BaseModel):
+    """An EMI the assistant worked out, with the EMI calculator's formula."""
+
+    listing_id: str
+    project: str
+    price_inr: int
+    down_payment_pct: float
+    loan_inr: int
+    rate_pct: float
+    years: int
+    emi_inr: int
+    total_interest_inr: int
+
+
+class ChatAction(BaseModel):
+    """Something the chat widget shows under the reply."""
+
+    type: Literal["contact_form", "visit_booked"]
+    purpose: Literal["site_visit", "callback"] | None = None  # what a contact_form is for
+    listing_id: str | None = None
+    project: str | None = None
+    need_contact: bool = False  # the form asks for a name and mobile number
+    day: date | None = None
+    slot: str | None = None
+    visit: VisitOut | None = None  # on visit_booked
+
+
 class ChatOut(BaseModel):
     reply: str
     listings: list[Listing]  # shown as cards under the reply
     extracted: dict[str, Any]  # details found in this message
     profile: dict[str, Any]  # everything known about the buyer so far
     mode: Literal["llm", "template"]
+    action: ChatAction | None = None  # a form or a booking to show under the reply
+    emi: EmiOut | None = None  # an EMI worked out for this message
 
 
 class ChatMessageOut(BaseModel):
@@ -285,6 +369,7 @@ class VisitorDetailOut(BaseModel):
     events: list[EventOut]  # newest first, up to 200
     leads: list[LeadOut]  # newest first
     chat: list[ChatMessageOut]  # oldest first
+    site_visits: list[VisitOut] = []  # newest first
     score_detail: dict[str, Any] | None = None  # rules that fired, SHAP factors, intent points (docs/CONTRACTS.md)
 
 

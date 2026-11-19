@@ -49,7 +49,7 @@ def test_nothing_found_in_small_talk():
 # ---------------------------------------------------------------- purpose and LLM extraction
 
 from app.ai import extract as extract_module  # noqa: E402
-from app.ai.extract import clean_details, smart_extract  # noqa: E402
+from app.ai.extract import clean_details, read_message  # noqa: E402
 from app.ai.llm_client import LLMError  # noqa: E402
 
 
@@ -93,7 +93,7 @@ def test_smart_extract_merges_the_llm_with_the_patterns(monkeypatch):
     fake = FakeLLM({"city": "Bengaluru", "locality": None, "bhk": None, "budget_min": None, "budget_max": None,
                     "timeline_months": None, "loan_needed": None, "purpose": None, "language": "en"})
     monkeypatch.setattr(extract_module, "llm", fake)
-    found = smart_extract("same budget but in Bangalore, call 9822012345", ["3BHK under 90L in Pune"])
+    found, _ = read_message("same budget but in Bangalore, call 9822012345", ["3BHK under 90L in Pune"])
     assert found["city"] == "Bengaluru"
     assert "[phone]" in fake.calls[0] and "9822012345" not in fake.calls[0]  # masked before it reaches the LLM
     assert "<earlier_messages>" in fake.calls[0]
@@ -103,10 +103,10 @@ def test_smart_extract_keeps_one_budget_pair(monkeypatch):
     fake = FakeLLM({"city": None, "locality": None, "bhk": None, "budget_min": 8_000_000, "budget_max": 8_500_000,
                     "timeline_months": None, "loan_needed": None, "purpose": None, "language": "hinglish"})
     monkeypatch.setattr(extract_module, "llm", fake)
-    found = smart_extract("80-85 lakh ke beech, under 1 cr nahi")
+    found, _ = read_message("80-85 lakh ke beech, under 1 cr nahi")
     assert (found["budget_min"], found["budget_max"]) == (8_000_000, 8_500_000)
 
 
 def test_smart_extract_falls_back_to_the_patterns(monkeypatch):
     monkeypatch.setattr(extract_module, "llm", FakeLLM(error=LLMError("timeout")))
-    assert smart_extract("3BHK under 90L in Pune")["budget_max"] == 9_000_000
+    assert read_message("3BHK under 90L in Pune")[0]["budget_max"] == 9_000_000
