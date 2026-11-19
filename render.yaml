@@ -1,0 +1,33 @@
+# The LeadOps backend on Render. Steps are in docs/DEPLOY.md.
+# The service runs from the repo root because the backend also serves sdk/ and uses ml/simulator.py.
+services:
+  - type: web
+    name: leadops-api
+    runtime: python
+    plan: free
+    region: singapore
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.14.6
+      # Paste the connection string from Neon when Render asks for it.
+      - key: DATABASE_URL
+        sync: false
+      # Render makes a random passcode. Find it under Environment and share it with the sales team.
+      - key: DASHBOARD_PASSCODE
+        generateValue: true
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: RETENTION_DAYS
+        value: "180"
+      # Optional: one LLM key. Without any, the assistant answers from templates.
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: LLM_MODEL
+        sync: false

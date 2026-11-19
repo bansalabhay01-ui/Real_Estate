@@ -1,4 +1,7 @@
-"""Test setup: a throwaway SQLite database and template mode, so tests never call a real LLM."""
+"""Test setup: a throwaway SQLite database and template mode, so tests never call a real LLM.
+
+To run the same tests against Postgres, as production uses, point TEST_DATABASE_URL at an empty database.
+"""
 
 import os
 import tempfile
@@ -6,7 +9,7 @@ from pathlib import Path
 
 # Set before the app is imported: real environment variables win over backend/.env.
 _TMP = Path(tempfile.mkdtemp(prefix="leadops-tests-"))
-os.environ["DATABASE_URL"] = f"sqlite:///{(_TMP / 'test.db').as_posix()}"
+os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL") or f"sqlite:///{(_TMP / 'test.db').as_posix()}"
 os.environ["LLM_PROVIDER"] = "none"
 
 import pytest  # noqa: E402

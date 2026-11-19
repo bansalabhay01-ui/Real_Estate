@@ -185,3 +185,20 @@ def test_stats_count_visitors_and_leads(client):
 def test_sdk_is_served(client):
     response = client.get("/sdk/leadops.js")
     assert response.status_code == 200 and "LeadOps" in response.text
+
+
+def test_odd_input_never_costs_a_batch_or_an_enquiry(client):
+    """Postgres refuses NUL characters and numbers too big for their column; SQLite lets them through."""
+    visitor_id, session_id = new_ids()
+    events = [{"type": "page_view", "ts": 10**30, "path": "/a\x00b", "title": "Home\x00page", "props": {"note": "x\x00y"}}]
+    assert send_events(client, visitor_id, session_id, events).status_code == 200
+    saved = client.get(f"/visitors/{visitor_id}").json()["events"][0]
+    assert saved["path"] == "/ab" and saved["title"] == "Homepage" and saved["client_ts"] is None
+
+    body = {"visitor_id": visitor_id, "name": "Asha\x00 Rao", "phone": "98220\x0012345", "message": "Call\x00 me", "form_fill_ms": 10**15, "client_ts": 10**30, "consent": True}
+    assert client.post("/leads", json=body).status_code == 201
+    lead = client.get(f"/visitors/{visitor_id}").json()["leads"][0]
+    assert lead["name"] == "Asha Rao" and lead["message"] == "Call me" and lead["form_fill_ms"] == 2_000_000_000
+
+    assert client.post("/chat", json={"visitor_id": visitor_id, "message": "3BHK\x00 in Pune"}).status_code == 200
+    assert client.post("/feedback", json={"visitor_id": visitor_id, "label": "genuine", "note": "ok\x00"}).status_code == 201

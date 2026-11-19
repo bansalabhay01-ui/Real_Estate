@@ -229,7 +229,13 @@ cd backend
 .venv\Scripts\python -m pytest        # Mac/Linux: .venv/bin/python -m pytest
 ```
 
-The tests use a temporary database and never call a real LLM. The Claude request shape is checked offline.
+The tests use a temporary database and never call a real LLM. The Claude request shape is checked offline. To run them
+against Postgres, as production uses, set `TEST_DATABASE_URL` to an empty database.
+
+## Deploy
+
+The backend goes on Render (`render.yaml`), the site on Vercel (`frontend/vercel.json`) and the database on Neon. The steps
+are in [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ## The LLM (optional)
 

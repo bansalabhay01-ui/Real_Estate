@@ -22,8 +22,14 @@ LEAD_SOURCES = ("form", "assistant_offer", "chat")  # where an enquiry came from
 
 
 def _clip(limit: int) -> AfterValidator:
-    """Cut long text instead of rejecting the whole request (a long page title shouldn't drop a batch)."""
-    return AfterValidator(lambda value: value[:limit] if isinstance(value, str) else value)
+    """Cut long text instead of rejecting the whole request (a long page title shouldn't drop a batch).
+    NUL characters go too: Postgres can't store them."""
+    return AfterValidator(lambda value: value.replace("\x00", "")[:limit] if isinstance(value, str) else value)
+
+
+# Numbers from browsers are kept only when they fit their database column, so an odd value never loses a batch.
+BrowserTime = Annotated[int | None, AfterValidator(lambda value: value if value is not None and abs(value) < 2**53 else None)]
+Milliseconds = Annotated[int | None, Field(ge=0), AfterValidator(lambda value: None if value is None else min(value, 2_000_000_000))]
 
 
 # ---------------------------------------------------------------- listings
@@ -87,7 +93,7 @@ _EVENT_TYPE_JUNK = re.compile(r"[^a-z0-9_.:-]+")
 
 class EventIn(BaseModel):
     type: str = Field(min_length=1, max_length=80)
-    ts: int | None = None  # browser clock, ms since epoch
+    ts: BrowserTime = None  # browser clock, ms since epoch
     path: Annotated[str | None, _clip(500)] = None
     url: Annotated[str | None, _clip(2000)] = None
     title: Annotated[str | None, _clip(300)] = None
@@ -299,8 +305,8 @@ class LeadIn(BaseModel):
     message: Annotated[str | None, _clip(2000)] = None
     consent: bool = False  # "I agree to be contacted" (DPDP Act 2023)
     honeypot: Annotated[str | None, _clip(500)] = None  # value of the hidden field; people leave it empty
-    form_fill_ms: int | None = Field(None, ge=0)  # first touch of the form until submit
-    client_ts: int | None = None
+    form_fill_ms: Milliseconds = None  # first touch of the form until submit
+    client_ts: BrowserTime = None
     page_url: Annotated[str | None, _clip(2000)] = None
     source: str | None = None  # form (the default) / assistant_offer / chat
 
@@ -395,7 +401,7 @@ class VisitIn(BaseModel):
     email: Annotated[str | None, _clip(200)] = None
     consent: bool = False
     honeypot: Annotated[str | None, _clip(500)] = None
-    form_fill_ms: int | None = Field(None, ge=0)
+    form_fill_ms: Milliseconds = None
 
 
 class VisitUpdate(BaseModel):
@@ -429,7 +435,7 @@ class VisitOut(BaseModel):
 class ChatIn(BaseModel):
     visitor_id: ClientId | None = None
     session_id: ClientId | None = None
-    message: str = Field(min_length=1, max_length=1000)
+    message: Annotated[str, Field(min_length=1, max_length=1000), _clip(1000)]
     listing_id: Annotated[str | None, _clip(32)] = None  # the property page the visitor is on, if any
 
 

@@ -1,5 +1,6 @@
 
 
+
 # LeadOps
 
 GenAI lead qualification for real estate websites. LeadOps scores every visitor, blocks bots and junk leads, finds genuine buyers (anonymous ones too) and explains each decision so sales can follow up fast. A team of 3 is building it for a national-level hackathon; the deadline is about 30 Nov 2026.
