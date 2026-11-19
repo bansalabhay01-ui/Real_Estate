@@ -170,8 +170,8 @@ visit from the same device counts too. The dashboard shows a "Test" chip on thes
 
 **What to tell testers**
 
-> Open the link on your phone or laptop and look for a home as if you were really buying: pick a city and a
-> budget, open a few homes, try the EMI calculator or the floor plan if you'd use them, and ask the assistant
+> Open the link on your phone or laptop and press **Accept** on the privacy banner (the test can't record you
+> otherwise). Then look for a home as if you were really buying: pick a city and a budget, open a few homes, try the EMI calculator or the floor plan if you'd use them, and ask the assistant
 > anything. Take 5 to 10 minutes. If you send an enquiry, use a made-up 10-digit number starting with 6 to 9 (not
 > 9999999999) and a made-up email, never your real ones.
 
@@ -204,6 +204,21 @@ LeadOps.onNudge(function (offer) {
   LeadOps.track("nudge_shown", { nudge_id: offer.id, kind: offer.kind });
 });
 ```
+
+## Privacy (DPDP Act 2023)
+
+- **Consent first.** The demo site asks before tracking anyone. Until the visitor presses Accept, nothing is sent and
+  nothing is stored in their browser; Decline stops tracking and the site keeps working. Any website can do the same
+  by adding `data-consent="required"` to the script tag and calling `LeadOps.consent(true)` or `LeadOps.consent(false)`.
+- **Masked for the LLM.** Phone numbers and emails are hidden before text reaches an LLM, and names are never sent.
+- **Retention.** Every day, data older than `RETENTION_DAYS` (default 180) is removed: browsing and chat are deleted,
+  visitors who never enquired disappear, and old enquiries lose their personal details.
+- **Erasure.** Visitors can press **Delete my data** on the privacy notice (`/privacy`), and the sales team can delete a
+  visitor from the dashboard.
+- **Dashboard passcode.** The dashboard shows names and phone numbers. Set `DASHBOARD_PASSCODE` in `backend/.env` before
+  you deploy, and the dashboard will ask for it.
+- **The phone check (OTP) is mocked.** After an enquiry the form asks for a 6-digit code, but no SMS is sent: the code
+  appears on screen, labelled as a demo. A real SMS provider can replace it later.
 
 ## Tests
 

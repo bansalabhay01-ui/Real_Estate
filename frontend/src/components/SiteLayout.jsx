@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router";
 import ChatWidget from "./ChatWidget";
+import ConsentBanner from "./ConsentBanner";
 import { PlanMark } from "./icons";
 
 const navClass = ({ isActive }) =>
@@ -40,16 +41,20 @@ export default function SiteLayout() {
         <div className="mx-auto flex max-w-6xl flex-col gap-1 px-4 py-6 text-sm text-muted">
           <p>LeadOps Realty is a demo site for the LeadOps project. All homes and prices are fictional.</p>
           <p>
-            Visits here are tracked by the LeadOps script.{" "}
+            If you agree, your visit is tracked by the LeadOps script.{" "}
             <Link to="/dashboard" className="font-medium text-blueprint underline underline-offset-2">
               Open the sales dashboard
             </Link>{" "}
-            to watch your own visit arrive.
+            to watch it arrive.{" "}
+            <Link to="/privacy" className="font-medium text-blueprint underline underline-offset-2">
+              Privacy notice
+            </Link>
           </p>
         </div>
       </footer>
 
       <ChatWidget />
+      <ConsentBanner />
     </div>
   );
 }

@@ -10,7 +10,22 @@ export function loadTracker() {
   script.dataset.api = API_URL;
   script.dataset.site = "leadops-realty-demo";
   script.dataset.excludePaths = "/dashboard"; // the sales team using the dashboard aren't visitors
+  script.dataset.consent = "required"; // nothing is sent until the visitor accepts the banner
   document.head.appendChild(script);
+}
+
+// The visitor's answer to the consent banner: "granted", "denied" or null when they haven't been asked yet.
+export function consentChoice() {
+  try {
+    return window.localStorage.getItem("leadops_consent");
+  } catch {
+    return null;
+  }
+}
+
+export function answerConsent(granted) {
+  if (window.LeadOps) window.LeadOps.consent(granted);
+  else (window.__leadopsQueue ||= []).push(["consent", granted]);
 }
 
 // Custom events. Calls made before the script has loaded are queued and sent once it has.

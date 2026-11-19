@@ -205,7 +205,7 @@ def load_record(db: Session, visitor_id: str) -> dict | None:
             {
                 "session_id": lead.session_id, "listing_id": lead.listing_id, "name": lead.name, "phone": lead.phone,
                 "email": lead.email, "message": lead.message, "consent": lead.consent, "honeypot": lead.honeypot,
-                "form_fill_ms": lead.form_fill_ms, "ip": lead.ip,
+                "form_fill_ms": lead.form_fill_ms, "ip": lead.ip, "phone_verified": bool(lead.phone_verified),
                 "client_ts": lead.client_ts if lead.client_ts is not None else _ms(lead.created_at),
             }
             for lead in leads

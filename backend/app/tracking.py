@@ -1,5 +1,6 @@
 """Saving what visitors do (events, enquiries) and reading it back for the dashboard."""
 
+import secrets
 import time
 import uuid
 from collections.abc import Callable
@@ -22,6 +23,8 @@ from .schemas import (
     LeadIn,
     LeadOut,
     NudgeRecordOut,
+    OtpOut,
+    OtpResult,
     ScoreOut,
     SessionOut,
     StatsOut,
@@ -33,11 +36,12 @@ from .schemas import (
     VisitUpdate,
 )
 from .scoring.model import current_model
-from .scoring.rules import check_phone, lead_checks
+from .scoring.rules import check_phone, lead_checks, phone_digits
 from .utils import automation_hints, device_from_ua, short_day, today_ist, utcnow
 
 DETAIL_EVENT_LIMIT = 200
 MAX_VISIT_DAYS = 60  # how far ahead a site visit can be booked
+MAX_OTP_TRIES = 5
 T = TypeVar("T")
 
 
@@ -66,9 +70,10 @@ def score_out(saved: dict | None) -> ScoreOut | None:
 
 def lead_out(lead: Lead, label: str | None = None, verdict: str | None = None) -> LeadOut:
     fields = {"phone": lead.phone, "email": lead.email, "name": lead.name, "message": lead.message,
-              "honeypot": lead.honeypot, "form_fill_ms": lead.form_fill_ms}
+              "honeypot": lead.honeypot, "form_fill_ms": lead.form_fill_ms, "phone_verified": lead.phone_verified}
     checks = [LeadCheckOut(**check) for check in lead_checks(fields)]
-    return LeadOut.model_validate(lead).model_copy(update={"label": label, "checks": checks, "source": lead.source or "form", "verdict": verdict})
+    extra = {"label": label, "checks": checks, "source": lead.source or "form", "verdict": verdict, "phone_verified": bool(lead.phone_verified)}
+    return LeadOut.model_validate(lead).model_copy(update=extra)
 
 
 def visitor_out(visitor: Visitor) -> VisitorOut:
@@ -239,6 +244,55 @@ def visitor_detail(visitor_id: str) -> VisitorDetailOut | None:
             )],  # fmt: skip
             score_detail=(visitor.score or {}).get("detail"),
         )
+
+
+# ---------------------------------------------------------------- the phone check after an enquiry (mocked: no SMS is sent)
+
+
+class OtpProblem(Exception):
+    """A verify request that can't be accepted: the status code and a sentence for the visitor."""
+
+    def __init__(self, status: int, detail: str):
+        super().__init__(detail)
+        self.status, self.detail = status, detail
+
+
+def _hidden_phone(phone: str) -> str:
+    digits = phone_digits(phone)
+    if len(digits) == 10:
+        return f"+91 {digits[:2]}xxx xx{digits[-3:]}"
+    return f"{digits[:2]}xxxx{digits[-3:]}"
+
+
+def start_otp(lead_id: int) -> OtpOut | None:
+    """Make the code for this enquiry. A number that could never receive one gets no phone check."""
+    with SessionLocal() as db:
+        lead = db.get(Lead, lead_id)
+        if lead is None or check_phone(lead.phone).kind not in ("mobile", "international"):
+            return None
+        lead.otp_code, lead.otp_token, lead.otp_tries = f"{secrets.randbelow(900_000) + 100_000}", secrets.token_hex(16), 0
+        db.commit()
+        return OtpOut(token=lead.otp_token, phone=_hidden_phone(lead.phone), demo_code=lead.otp_code)
+
+
+def check_otp(lead_id: int, token: str, code: str) -> tuple[OtpResult, str]:
+    """(the result, the visitor's ID). Five wrong codes end the check."""
+    with SessionLocal() as db:
+        lead = db.get(Lead, lead_id)
+        if lead is None or not lead.otp_token or not secrets.compare_digest(lead.otp_token, token):
+            raise OtpProblem(403, "This code can't be checked for that enquiry")
+        if lead.phone_verified:
+            return OtpResult(verified=True, tries_left=0), lead.visitor_id
+        tries = lead.otp_tries or 0
+        if tries >= MAX_OTP_TRIES:
+            raise OtpProblem(429, "Too many wrong codes. The sales team will confirm your number on the call.")
+        if secrets.compare_digest(lead.otp_code or "", code.strip()):
+            lead.phone_verified, lead.otp_code = True, None
+            db.commit()
+            return OtpResult(verified=True, tries_left=0), lead.visitor_id
+        lead.otp_tries = tries + 1
+        db.commit()
+        return OtpResult(verified=False, tries_left=MAX_OTP_TRIES - lead.otp_tries), lead.visitor_id
 
 
 # ---------------------------------------------------------------- site visits

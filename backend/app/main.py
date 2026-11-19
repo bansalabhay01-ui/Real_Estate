@@ -4,6 +4,7 @@ Run from the backend folder:  uvicorn app.main:app --reload
 Interactive API docs:          http://localhost:8000/docs
 """
 
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -14,7 +15,9 @@ from .ai.llm_client import llm
 from .api import api_router
 from .config import REPO_DIR, settings
 from .db import init_db
+from . import auth
 from .listings import all_listings
+from .retention import retention_loop
 from .scoring.model import current_model
 
 
@@ -23,7 +26,9 @@ async def lifespan(_app: FastAPI):
     init_db()
     all_listings()  # fail at startup, not on the first request, if listings.json is broken
     current_model()  # load the scoring model now, not on the first event (falls back to a formula if missing)
+    clean_up = asyncio.create_task(retention_loop())
     yield
+    clean_up.cancel()
 
 
 app = FastAPI(title="LeadOps API", version="0.1.0", lifespan=lifespan)
@@ -45,4 +50,11 @@ if _SDK_DIR.is_dir():
 @app.get("/health", tags=["meta"])
 def health() -> dict:
     """Quick check that the API is up, which LLM (or template mode) the assistant uses and which scoring model."""
-    return {"status": "ok", "llm": llm.describe(), "listings": len(all_listings()), "model": current_model().version}
+    return {
+        "status": "ok",
+        "llm": llm.describe(),
+        "listings": len(all_listings()),
+        "model": current_model().version,
+        "retention_days": settings.retention_days,
+        "dashboard_locked": bool(auth.current_passcode()),
+    }

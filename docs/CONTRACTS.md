@@ -101,7 +101,12 @@ Custom events from any site: `LeadOps.track("name", {...})`. Names are lower-cas
 }
 ```
 
-Response `201`: `{"ok": true, "lead_id": 12}`.
+Response `201`: `{"ok": true, "lead_id": 12, "otp": {"token": "...", "phone": "+91 98xxx xx345", "demo_code": "482913"}}`.
+`otp` is `null` for a number that could never receive a code.
+
+The phone check is mocked for the demo: no SMS is sent and the site shows `demo_code`. `POST /leads/{id}/verify` takes
+`{"token": "...", "code": "482913"}` and answers `{"verified": true, "tries_left": 0}`. Five wrong codes end the check
+(`429`), and a wrong token gets `403`. A verified phone adds the `otp` check and 5 intent points.
 
 - **honeypot**: the value of a field hidden from people. Real people leave it empty; form bots fill it.
 - **form_fill_ms**: from the first touch of the form to submit. `0` means the form was sent without typing.
@@ -111,8 +116,8 @@ Response `201`: `{"ok": true, "lead_id": 12}`.
   value is dropped, never rejected. `LeadOut` always has it.
 - `LeadOut` (in `GET /leads` and the WebSocket) adds `label` (the visitor's current label, or `null`) and
   `checks`: `[{"check": "phone", "ok": false, "text": "Phone: the same digit over and over"}, ...]` for `phone`,
-  `email`, `name`, `message`, `honeypot` and `fill_time` (only the ones that apply), and `verdict` (the sales team's
-  latest verdict on this visitor, or `null`).
+  `email`, `name`, `message`, `honeypot`, `fill_time` and `otp` (only the ones that apply), `verdict` (the sales team's
+  latest verdict on this visitor, or `null`) and `phone_verified`.
 
 ## 3. Assistant: frontend -> `POST /chat`
 
@@ -169,7 +174,9 @@ is outside the next 60 days, `404` for an unknown home.
 | `POST /scoring/rescore` | reload the model (after `ml/train.py`) and relabel every visitor in the background: `{"ok": true, "visitors": 512}` | B |
 | `GET /listings?city=&bhk=&min_price=&max_price=&q=` | listings | B |
 | `GET /listings/{id}` | one listing | B |
-| `POST /leads`, `GET /leads`, `GET /leads/{id}` | enquiries | B |
+| `DELETE /visitors/{id}` | erase a visitor and everything about them. Needs the dashboard passcode, or the visitor's own ID in `X-LeadOps-Visitor` | B |
+| `GET /auth/check` | `{"ok": true}` when the dashboard passcode is right | B |
+| `POST /leads`, `GET /leads`, `GET /leads/{id}`, `POST /leads/{id}/verify` | enquiries and the phone check | B |
 | `POST /chat`, `GET /chat/{visitor_id}` | the assistant and a visitor's conversation | C |
 | `POST /visits`, `GET /visits?status=&limit=`, `PATCH /visits/{id}` | site visits, soonest first; `PATCH` takes `{status, day, slot}` | B |
 | `POST /feedback`, `GET /feedback` | sales verdicts: `genuine` / `fake` / `converted`. A verdict relabels the visitor at once (section 6) | B |
@@ -179,7 +186,17 @@ is outside the next 60 days, `404` for an unknown home.
 | `DELETE /demo/simulated` | remove the visitors the button made (IDs starting `sim-`): `{"ok": true, "removed": 250}` | B |
 | `POST /demo/bot` | `{kind: "naive" / "stealth" / "scraper", site, headed}`: run one real Playwright bot on the backend's laptop. `501` where Playwright isn't installed, `422` for a site outside this laptop's network | B |
 | `GET /sdk/leadops.js` | the tracking script | A |
-| `GET /health` | `{status, llm, listings, model}`; `model` is the scoring model's version, or `fallback` | B |
+| `GET /health` | `{status, llm, listings, model, retention_days, dashboard_locked}`; `model` is the scoring model's version, or `fallback` | B |
+
+**Dashboard passcode.** When the backend has `DASHBOARD_PASSCODE` set, these need it in the `X-LeadOps-Passcode` header (`401`
+otherwise): `/stats`, every `/visitors` route, `GET /leads`, `GET /leads/{id}`, `GET` and `PATCH /visits`, `/feedback`, `/demo/*`,
+`/scoring/rescore` and `/auth/check`. The WebSocket takes it as `?passcode=`. `POST /events`, `POST /leads`, `POST /chat`,
+`POST /visits`, `/listings` and `/sdk` stay open, because visitors use them.
+
+**Consent.** With `data-consent="required"` on its script tag, SDK 1.3 sends and stores nothing until the site calls
+`LeadOps.consent(true)`; events wait in memory and go out then. `LeadOps.consent(false)` drops them, forgets the visitor's IDs
+and stops tracking. The answer is remembered in `localStorage` as `leadops_consent`. While tracking is off or undecided,
+`LeadOps.ids()` returns null IDs. Sites without the attribute work as before.
 
 ## 5. Dashboard WebSocket: `WS /ws/dashboard`
 
@@ -247,8 +264,8 @@ Build Plan, and `backend/app/scoring/combine.py`). A sales verdict overrules the
   `null`. A confident (0.7+) broker, spam or tenant is `Junk`, or `Review` with intent 70+.
 
 Intent points: time on property pages (up to 20), repeat visits (up to 15), details shared with the assistant (up to
-15), EMI calculator (12), floor plan (12), a valid enquiry (10), a focused search (up to 10), filters (6) and a requested
-site visit (15), capped at 100. `VisitorDetailOut` also lists the visitor's `site_visits`.
+15), EMI calculator (12), floor plan (12), a valid enquiry (10), a verified phone (5), a focused search (up to 10), filters (6)
+and a requested site visit (15), capped at 100. `VisitorDetailOut` also lists the visitor's `site_visits`.
 
 `VisitorDetailOut.score_detail` (only in `GET /visitors/{id}`):
 

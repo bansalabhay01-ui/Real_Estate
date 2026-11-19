@@ -2,18 +2,47 @@
 
 from typing import Literal
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
 
 from ..ai.brief import build_brief, build_followup
-from ..schemas import BriefOut, FollowUpIn, FollowUpOut, NudgeOut, RescoreOut, StatsOut, VisitorDetailOut, VisitorOut
+from ..auth import DASHBOARD_ONLY, PASSCODE_HEADER, passcode_ok
+from ..db import SessionLocal
+from ..models import Visitor
+from ..retention import erase_visitors
+from ..schemas import AccessOut, BriefOut, ErasedOut, FollowUpIn, FollowUpOut, NudgeOut, RescoreOut, StatsOut, VisitorDetailOut, VisitorOut
 from ..scoring.engine import broadcast_snapshot, rescore_all
 from ..scoring.nudge import OfferRefused, queue_offer
 from ..tracking import dashboard_stats, list_visitors, visitor_detail
 
-router = APIRouter(tags=["visitors"])
+router = APIRouter(tags=["visitors"], dependencies=DASHBOARD_ONLY)
+erasure = APIRouter(tags=["privacy"])  # visitors can erase their own data, so this one has its own check
 
 Label = Literal["Bot", "Junk", "Review", "Cold", "Warm", "Hot"]
+
+
+@router.get("/auth/check", response_model=AccessOut)
+def check_access() -> AccessOut:
+    """Lets the dashboard find out whether its passcode is right."""
+    return AccessOut()
+
+
+def _erase(visitor_id: str) -> bool:
+    with SessionLocal() as db:
+        return db.get(Visitor, visitor_id) is not None and erase_visitors(db, [visitor_id]) == 1
+
+
+@erasure.delete("/visitors/{visitor_id}", response_model=ErasedOut)
+async def erase_visitor(visitor_id: str, request: Request) -> ErasedOut:
+    """Delete a visitor and everything about them (DPDP Act 2023, the right to erasure). The sales team can do this from
+    the dashboard, and visitors can do it for themselves by sending their own anonymous ID in X-LeadOps-Visitor."""
+    is_themselves = request.headers.get("x-leadops-visitor") == visitor_id
+    if not is_themselves and not passcode_ok(request.headers.get(PASSCODE_HEADER)):
+        raise HTTPException(status_code=401, detail="Enter the dashboard passcode")
+    if not await run_in_threadpool(_erase, visitor_id):
+        raise HTTPException(status_code=404, detail="Visitor not found")
+    await broadcast_snapshot()
+    return ErasedOut()
 
 
 @router.get("/stats", response_model=StatsOut)

@@ -179,6 +179,8 @@ def lead_checks(lead: dict) -> list[dict]:
     phone = check_phone(lead.get("phone"))
     phone_text = {"mobile": "Valid mobile number", "international": "International number"}
     checks.append({"check": "phone", "ok": phone.kind in phone_text, "text": phone_text.get(phone.kind, f"Phone: {phone.reason}")})
+    if lead.get("phone_verified"):
+        checks.append({"check": "otp", "ok": True, "text": "Phone verified by OTP"})
     email = check_email(lead.get("email"))
     if email.kind != "none":
         checks.append({"check": "email", "ok": email.kind == "ok", "text": "Real-looking email" if email.kind == "ok" else f"Email: {email.reason}"})

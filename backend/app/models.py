@@ -130,6 +130,10 @@ class Lead(Base):
     client_ts: Mapped[int | None] = mapped_column(BigInteger)
     status: Mapped[str] = mapped_column(String(20), default="new")
     source: Mapped[str | None] = mapped_column(String(20))  # form / assistant_offer / chat (older rows: empty, a form)
+    phone_verified: Mapped[bool | None] = mapped_column(Boolean)  # the buyer entered the OTP (mocked in the demo)
+    otp_code: Mapped[str | None] = mapped_column(String(6))
+    otp_token: Mapped[str | None] = mapped_column(String(32))
+    otp_tries: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 

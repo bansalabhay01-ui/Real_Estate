@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
 
 from ..ai.assistant import visit_confirmation
+from ..auth import DASHBOARD_ONLY
 from ..realtime import hub
 from ..schemas import VisitIn, VisitOut, VisitUpdate
 from ..scoring.engine import publish, score_safely
@@ -31,7 +32,7 @@ async def create_visit(payload: VisitIn, request: Request) -> VisitOut:
     return visit.model_copy(update={"confirmation": visit_confirmation(payload.language, visit)})
 
 
-@router.get("/visits", response_model=list[VisitOut])
+@router.get("/visits", response_model=list[VisitOut], dependencies=DASHBOARD_ONLY)
 def get_visits(
     limit: int = Query(50, ge=1, le=200),
     status: Literal["requested", "confirmed", "done", "cancelled"] | None = Query(None),
@@ -40,7 +41,7 @@ def get_visits(
     return list_site_visits(limit=limit, status=status)
 
 
-@router.patch("/visits/{visit_id}", response_model=VisitOut)
+@router.patch("/visits/{visit_id}", response_model=VisitOut, dependencies=DASHBOARD_ONLY)
 async def change_visit(visit_id: int, change: VisitUpdate) -> VisitOut:
     """Confirm, move or cancel a visit. A cancelled visit stops counting towards the visitor's intent."""
     visit = await run_in_threadpool(update_site_visit, visit_id, change)

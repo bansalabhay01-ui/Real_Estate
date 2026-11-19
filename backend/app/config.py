@@ -45,6 +45,15 @@ class Settings:
     anthropic_api_key: str
     gemini_api_key: str
     groq_api_key: str
+    dashboard_passcode: str  # empty: the dashboard is open (local development)
+    retention_days: int  # personal data older than this is removed; 0 keeps it
+
+
+def _whole_number(name: str, default: int) -> int:
+    try:
+        return max(0, int(_env(name, str(default))))
+    except ValueError:
+        return default
 
 
 settings = Settings(
@@ -55,4 +64,6 @@ settings = Settings(
     anthropic_api_key=_env("ANTHROPIC_API_KEY"),
     gemini_api_key=_env("GEMINI_API_KEY"),
     groq_api_key=_env("GROQ_API_KEY"),
+    dashboard_passcode=_env("DASHBOARD_PASSCODE"),
+    retention_days=_whole_number("RETENTION_DAYS", 180),
 )

@@ -7,12 +7,14 @@
  *   data-api            API base URL (default: the address the script was loaded from)
  *   data-site           a name for this website (default: the page's hostname)
  *   data-exclude-paths  comma-separated path prefixes to skip, e.g. "/dashboard,/admin"
+ *   data-consent        "required": send and store nothing until the site calls LeadOps.consent(true)
  *
  * In page code:
  *   LeadOps.track("emi_used", { emi: 52000 })  record a custom event
  *   LeadOps.ids()                                { visitor_id, session_id } for your own API calls
  *   LeadOps.flush()                              send queued events now
  *   LeadOps.onNudge(function (offer) { ... })    show the assistant's offers to serious anonymous visitors
+ *   LeadOps.consent(true)                        the visitor agreed: start sending (false: stop and forget them)
  *
  * Test sessions (for measuring LeadOps on real people and real bots):
  *   open any page with ?lo_test=genuine (or junk / bot) and optionally &lo_tester=t01. The browser remembers it
@@ -25,11 +27,15 @@
   "use strict";
   if (window.LeadOps && window.LeadOps.version) return; // already loaded on this page
 
-  var VERSION = "1.2.0";
+  var VERSION = "1.3.0";
   var SESSION_TIMEOUT_MS = 30 * 60 * 1000; // a new visit starts after 30 minutes without activity
   var FLUSH_INTERVAL_MS = 5000;
   var ACTIVITY_INTERVAL_MS = 10000;
   var MAX_QUEUE = 50;
+  var MAX_BATCH = 100; // the API takes at most this many events at a time
+  var MAX_HELD = 300; // events kept in memory while waiting for the visitor's answer
+  var CONSENT_KEY = "leadops_consent";
+  var STORED_KEYS = ["leadops_vid", "leadops_sid", "leadops_sid_at", "leadops_test", "leadops_tester"];
   var SCROLL_MARKS = [25, 50, 75, 100];
 
   // ---------------------------------------------------------------- configuration from the script tag
@@ -53,15 +59,28 @@
   // ---------------------------------------------------------------- storage (falls back to memory when blocked)
 
   var memory = {};
+  function stored(key) {
+    try { return window.localStorage.getItem(key); } catch (e) { return null; /* storage blocked */ }
+  }
+  function store(key, value) {
+    try { window.localStorage.setItem(key, value); } catch (e) { /* storage blocked: memory only */ }
+  }
+
+  // With data-consent="required", nothing is sent or stored in the browser until the visitor says yes.
+  var consentRequired = attr("data-consent") === "required";
+  var consentAnswer = stored(CONSENT_KEY); // "granted", "denied" or null (not asked yet)
+  function waitingForConsent() { return consentRequired && consentAnswer === null; }
+  function trackingOff() { return consentRequired && consentAnswer === "denied"; }
+  function mayStore() { return !consentRequired || consentAnswer === "granted"; }
+
   function load(key) {
-    var value = null;
-    try { value = window.localStorage.getItem(key); } catch (e) { /* storage blocked */ }
+    var value = mayStore() ? stored(key) : null;
     if (value !== null) return value;
     return Object.prototype.hasOwnProperty.call(memory, key) ? memory[key] : null;
   }
   function save(key, value) {
     memory[key] = value;
-    try { window.localStorage.setItem(key, value); } catch (e) { /* storage blocked: memory only */ }
+    if (mayStore()) store(key, value);
   }
   function forget(key) {
     delete memory[key];
@@ -155,6 +174,7 @@
   var flushTimer = null;
 
   function push(type, props, path) {
+    if (trackingOff()) return;
     path = path || location.pathname;
     if (isExcluded(path)) return;
     var sessionId = touchSession();
@@ -168,6 +188,7 @@
       title: document.title,
       props: props || {}
     });
+    if (queue.length > MAX_HELD) queue.shift(); // still waiting for the visitor's answer: keep only the latest
     if (queue.length >= MAX_QUEUE) flush(false);
   }
 
@@ -199,7 +220,7 @@
   }
 
   function flush(pageClosing) {
-    if (!queue.length) return;
+    if (!queue.length || waitingForConsent() || trackingOff()) return;
     var body = JSON.stringify({
       visitor_id: visitorId,
       session_id: queueSession,
@@ -207,8 +228,9 @@
       sdk_version: VERSION,
       sent_at: Date.now(),
       context: context(),
-      events: queue.splice(0, queue.length)
+      events: queue.splice(0, MAX_BATCH)
     });
+    if (queue.length) scheduleFlush(50); // events held back until the visitor agreed go out in several batches
     // text/plain keeps this a "simple" request: no CORS preflight, and sendBeacon accepts it.
     if (pageClosing && navigator.sendBeacon) {
       try {
@@ -379,12 +401,37 @@
     scheduleFlush(500); // custom events are rare and important: send them soon
   }
 
+  // The visitor's answer. Yes: what was held back goes out and the IDs are stored. No: everything is dropped and forgotten.
+  function consent(granted) {
+    consentAnswer = granted ? "granted" : "denied";
+    store(CONSENT_KEY, consentAnswer);
+    if (granted) {
+      STORED_KEYS.forEach(function (key) {
+        if (Object.prototype.hasOwnProperty.call(memory, key)) store(key, memory[key]);
+      });
+      if (!visitorId) {
+        visitorId = newId();
+        save("leadops_vid", visitorId);
+      }
+      flush(false);
+    } else {
+      queue.length = 0;
+      queueSession = null;
+      STORED_KEYS.forEach(forget);
+      visitorId = null;
+    }
+  }
+
   window.LeadOps = {
     version: VERSION,
     track: track,
-    ids: function () { return { visitor_id: visitorId, session_id: touchSession() }; },
+    ids: function () {
+      if (waitingForConsent() || trackingOff()) return { visitor_id: null, session_id: null };
+      return { visitor_id: visitorId, session_id: touchSession() };
+    },
     flush: function () { flushActivity(); flush(false); },
-    onNudge: onNudge
+    onNudge: onNudge,
+    consent: consent
   };
 
   // Calls a site made before this script finished loading: window.__leadopsQueue.push(["track", name, props])
@@ -393,6 +440,7 @@
     push: function (call) {
       if (call && call[0] === "track") track(call[1], call[2]);
       if (call && call[0] === "onNudge") onNudge(call[1]);
+      if (call && call[0] === "consent") consent(call[1]);
     }
   };
   if (early && early.length) early.forEach(window.__leadopsQueue.push);

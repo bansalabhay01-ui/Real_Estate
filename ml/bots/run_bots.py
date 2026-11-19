@@ -54,6 +54,14 @@ def launch(playwright, browser: str, *, headed: bool, slow_mo: int, stealth: boo
     raise SystemExit(f"Couldn't start a browser: {problem}\nInstall Edge or Chrome, or run: python -m playwright install chromium")
 
 
+def accept_banner(page) -> None:
+    """The demo site asks before it tracks anyone. A bot that wants to blend in says yes, as a real one would."""
+    try:
+        page.get_by_role("button", name="Accept", exact=True).click(timeout=5000)
+    except PlaywrightError:
+        pass  # no banner: this browser has already answered, or the site doesn't ask
+
+
 def wander(page, rng: random.Random, moves: int) -> None:
     """Scripted mouse moves: straight lines in a few big steps, which is what gives a stealth bot away."""
     width, height = page.viewport_size["width"], page.viewport_size["height"]
@@ -78,6 +86,7 @@ def open_listing(page, rng: random.Random, *, by_mouse: bool) -> None:
 
 def naive_bot(page, site: str, rng: random.Random) -> str:
     page.goto(tester_link(site, "naive"))
+    accept_banner(page)
     page.wait_for_selector(LISTING_LINKS)
     href = page.locator(LISTING_LINKS).first.get_attribute("href")
     page.goto(site + href)
@@ -99,6 +108,7 @@ def naive_bot(page, site: str, rng: random.Random) -> str:
 
 def stealth_bot(page, site: str, rng: random.Random) -> str:
     page.goto(tester_link(site, "stealth"))
+    accept_banner(page)
     page.wait_for_selector(LISTING_LINKS)
     wander(page, rng, 3)
     page.mouse.wheel(0, rng.randint(400, 900))
@@ -128,6 +138,7 @@ def stealth_bot(page, site: str, rng: random.Random) -> str:
 
 def scraper_bot(page, site: str, rng: random.Random) -> str:
     page.goto(tester_link(site, "scraper"))
+    accept_banner(page)
     page.wait_for_selector(LISTING_LINKS)
     hrefs = page.eval_on_selector_all(LISTING_LINKS, "links => [...new Set(links.map(a => a.getAttribute('href')))]")
     prices = {}

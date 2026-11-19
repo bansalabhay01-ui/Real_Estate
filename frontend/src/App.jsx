@@ -2,6 +2,7 @@ import { Link, Route, Routes } from "react-router";
 import SiteLayout from "./components/SiteLayout";
 import Dashboard from "./pages/Dashboard";
 import Home from "./pages/Home";
+import Privacy from "./pages/Privacy";
 import Property from "./pages/Property";
 
 function NotFound() {
@@ -22,6 +23,7 @@ export default function App() {
       <Route element={<SiteLayout />}>
         <Route index element={<Home />} />
         <Route path="property/:id" element={<Property />} />
+        <Route path="privacy" element={<Privacy />} />
         <Route path="*" element={<NotFound />} />
       </Route>
       {/* The sales team's view (never tracked). */}

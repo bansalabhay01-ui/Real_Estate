@@ -3,10 +3,11 @@
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
 
+from ..auth import DASHBOARD_ONLY
 from ..realtime import hub
-from ..schemas import LeadAccepted, LeadIn, LeadOut
+from ..schemas import LeadAccepted, LeadIn, LeadOut, OtpCheckIn, OtpResult
 from ..scoring.engine import classify_in_background, publish, score_safely
-from ..tracking import get_lead, list_leads, store_lead
+from ..tracking import OtpProblem, check_otp, get_lead, list_leads, start_otp, store_lead
 from ..utils import client_ip
 
 router = APIRouter(tags=["leads"])
@@ -24,16 +25,28 @@ async def create_lead(payload: LeadIn, request: Request, background: BackgroundT
     await publish(visitor, update)
     if payload.message:
         background.add_task(classify_in_background, lead.visitor_id)
-    return LeadAccepted(lead_id=lead.id)
+    return LeadAccepted(lead_id=lead.id, otp=await run_in_threadpool(start_otp, lead.id))
 
 
-@router.get("/leads", response_model=list[LeadOut])
+@router.post("/leads/{lead_id}/verify", response_model=OtpResult)
+async def verify_phone(lead_id: int, payload: OtpCheckIn) -> OtpResult:
+    """Check the 6-digit code. It is mocked for the demo: no SMS is sent, and the code comes back with the enquiry."""
+    try:
+        result, visitor_id = await run_in_threadpool(check_otp, lead_id, payload.token, payload.code)
+    except OtpProblem as problem:
+        raise HTTPException(status_code=problem.status, detail=problem.detail) from None
+    if result.verified:
+        await publish(None, await run_in_threadpool(score_safely, visitor_id))
+    return result
+
+
+@router.get("/leads", response_model=list[LeadOut], dependencies=DASHBOARD_ONLY)
 def get_leads(limit: int = Query(50, ge=1, le=500), offset: int = Query(0, ge=0)) -> list[LeadOut]:
     """Newest first."""
     return list_leads(limit=limit, offset=offset)
 
 
-@router.get("/leads/{lead_id}", response_model=LeadOut)
+@router.get("/leads/{lead_id}", response_model=LeadOut, dependencies=DASHBOARD_ONLY)
 def get_one_lead(lead_id: int) -> LeadOut:
     lead = get_lead(lead_id)
     if lead is None:

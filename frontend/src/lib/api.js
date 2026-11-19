@@ -1,10 +1,34 @@
 import { API_URL } from "./config";
 import { visitorIds } from "./leadops";
 
-async function request(path, { method = "GET", body } = {}) {
+const PASSCODE_KEY = "leadops_dashboard_passcode";
+
+// The dashboard's passcode lasts as long as this browser tab, and is only ever sent to the LeadOps API.
+export function dashboardPasscode() {
+  try {
+    return window.sessionStorage.getItem(PASSCODE_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+export function rememberPasscode(code) {
+  try {
+    window.sessionStorage.setItem(PASSCODE_KEY, code);
+  } catch {
+    // storage blocked: the dashboard asks again next time
+  }
+}
+
+async function request(path, { method = "GET", body, headers = {} } = {}) {
+  const passcode = dashboardPasscode();
   const response = await fetch(`${API_URL}${path}`, {
     method,
-    headers: body ? { "Content-Type": "application/json" } : undefined,
+    headers: {
+      ...(body ? { "Content-Type": "application/json" } : {}),
+      ...(passcode ? { "X-LeadOps-Passcode": passcode } : {}),
+      ...headers,
+    },
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!response.ok) {
@@ -54,6 +78,24 @@ export const sendOffer = (visitorId) => request(`/visitors/${encodeURIComponent(
 
 // The live demo tools on the dashboard.
 export const rescoreEveryone = () => request("/scoring/rescore", { method: "POST" });
+
+// Privacy and the phone check.
+export const getHealth = () => request("/health");
+export const verifyPhone = (leadId, token, code) => request(`/leads/${leadId}/verify`, { method: "POST", body: { token, code } });
+export const eraseVisitor = (visitorId) => request(`/visitors/${encodeURIComponent(visitorId)}`, { method: "DELETE" });
+export const eraseMyData = (visitorId) =>
+  request(`/visitors/${encodeURIComponent(visitorId)}`, { method: "DELETE", headers: { "X-LeadOps-Visitor": visitorId } });
+
+// False only when the API says the passcode is missing or wrong.
+export async function hasDashboardAccess() {
+  try {
+    await request("/auth/check");
+    return true;
+  } catch (error) {
+    return error.status !== 401;
+  }
+}
+
 export const getDemoStatus = () => request("/demo/status");
 export const startSimulation = (numbers) => request("/demo/simulate", { method: "POST", body: numbers });
 export const clearSimulated = () => request("/demo/simulated", { method: "DELETE" });

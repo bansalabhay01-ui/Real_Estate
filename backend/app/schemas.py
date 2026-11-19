@@ -279,9 +279,36 @@ class LeadIn(BaseModel):
         return value if value in LEAD_SOURCES else None
 
 
+class OtpOut(BaseModel):
+    """The phone check that follows an enquiry. It is mocked: no SMS is sent and the site shows demo_code on screen."""
+
+    token: str  # proves the verify request comes from whoever sent this enquiry
+    phone: str  # the number with most digits hidden, e.g. "+91 98xxx xx345"
+    demo_code: str
+
+
 class LeadAccepted(BaseModel):
     ok: bool = True
     lead_id: int
+    otp: OtpOut | None = None  # only for a number that could receive a code
+
+
+class OtpCheckIn(BaseModel):
+    token: str = Field(min_length=8, max_length=64)
+    code: str = Field(min_length=1, max_length=12)
+
+
+class OtpResult(BaseModel):
+    verified: bool
+    tries_left: int
+
+
+class AccessOut(BaseModel):
+    ok: bool = True
+
+
+class ErasedOut(BaseModel):
+    ok: bool = True
 
 
 class LeadCheckOut(BaseModel):
@@ -314,6 +341,7 @@ class LeadOut(BaseModel):
     checks: list[LeadCheckOut] = []
     source: str | None = "form"  # form / assistant_offer / chat
     verdict: str | None = None  # the sales team's latest verdict on this visitor
+    phone_verified: bool | None = False  # the buyer entered the OTP
 
 
 # ---------------------------------------------------------------- site visits -> POST /visits

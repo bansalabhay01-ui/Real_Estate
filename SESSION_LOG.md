@@ -5,9 +5,9 @@ A short diary of LeadOps work sessions, newest first. Claude saves each session 
 ## Current status
 _Last updated: 2026-11-18_
 
-- **Phase:** Week 3 (Integration + Wow) in progress: Parts 1-5 of 6 done. Deadline about 30 Nov 2026.
-- **Done:** the Week 1 foundation (demo property site, tracking SDK, FastAPI backend, a basic property assistant in English, Hinglish and Hindi, the live sales dashboard, the traffic simulator, the shared contracts draft), all of Week 2 ("Week 2 Build Plan" in `LEADOPS_PLAN.md`: tester links, simulator v2, features and rules, the LightGBM human check with SHAP, intent points, labels and reasons, dashboard v1, three real Playwright bots, LLM extraction and visitor type) and Week 3 Parts 1-5: the dashboard's Simulate traffic button with a live scoreboard and Run a real bot; the assistant as a LangGraph agent with brochure answers, EMIs, site visits and Marathi; the smart engagement trigger that turns serious anonymous visitors into leads; the lead brief with a next step, follow-up drafts in the buyer's language, one-click site visits and sales verdicts; the says-versus-does checks and retraining that learns from sales verdicts. 216 tests pass.
-- **Next:** Week 3 Part 6: privacy (consent, retention, erasure), the mocked OTP and the dashboard passcode. Classmates can start test sessions now (README, "Collecting real test sessions"); the real test set has no human sessions yet.
+- **Phase:** Week 3 (Integration + Wow) is finished, all six parts. Week 4 (polish, deploy and pitch) is next. Deadline about 30 Nov 2026.
+- **Done:** the Week 1 foundation (demo property site, tracking SDK, FastAPI backend, a basic property assistant in English, Hinglish and Hindi, the live sales dashboard, the traffic simulator, the shared contracts draft), all of Week 2 ("Week 2 Build Plan" in `LEADOPS_PLAN.md`: tester links, simulator v2, features and rules, the LightGBM human check with SHAP, intent points, labels and reasons, dashboard v1, three real Playwright bots, LLM extraction and visitor type) and all of Week 3: the dashboard's Simulate traffic button with a live scoreboard and Run a real bot; the assistant as a LangGraph agent with brochure answers, EMIs, site visits and Marathi; the smart engagement trigger that turns serious anonymous visitors into leads; the lead brief with a next step, follow-up drafts in the buyer's language, one-click site visits and sales verdicts; the says-versus-does checks and retraining that learns from sales verdicts; consent before tracking, data retention and erasure, a mocked OTP and a dashboard passcode. 240 tests pass.
+- **Next:** Week 4: the analytics page, deployment setup, final metrics, the pitch deck and demo script. Classmates can start test sessions now (README, "Collecting real test sessions"); the real test set has no human sessions yet.
 - **Blocked:** the LLM features haven't been tried with a real API key (the user hasn't approved spending it); template mode and the keyword rules work, and Claude's request shape matches the API reference.
 - **Code:** https://github.com/bansalabhay01-ui/Real_Estate (branch `main`)
 
@@ -43,9 +43,16 @@ _Last updated: 2026-11-18_
   - `ml/train.py` reads the sales verdicts. Genuine and Converted join the training data at five times the weight. Fake counts as a bot only when nothing else explains it: a broker or a made-up number is a person with bad details, and shouldn't teach the human check. It reports how the model that was running did on those visitors, saves the counts in `model_info.json` and, with 20 or more verdicts, prints suggested intent points for the team to review.
   - Dashboard: the model version, how many verdicts it learned from, and a **Relabel everyone** button.
   - Checked: 216 tests pass and the frontend builds. A headless Edge check passed 7/7. A real training run on throwaway data learned from 17 of 22 marked visitors, wrote to a scratch folder and left the committed model unchanged.
+- **Part 6, privacy and OTP:**
+  - Consent: SDK 1.3 supports `data-consent="required"`: nothing is sent or stored until `LeadOps.consent(true)`. The demo site asks with a banner (Accept and Decline carry equal weight) and has a privacy notice at `/privacy` with a Delete my data button.
+  - `backend/app/retention.py`: a clean-up at startup and then daily (`RETENTION_DAYS`, default 180) deletes old browsing and chat, removes visitors who never enquired and strips personal details from old enquiries. `DELETE /visitors/{id}` erases a visitor, from the dashboard or by the visitor themselves.
+  - OTP (mocked): after an enquiry the form asks for a 6-digit code, shown on screen and labelled as a demo. `POST /leads/{id}/verify` adds a "Phone verified by OTP" check and 5 intent points.
+  - `backend/app/auth.py`: with `DASHBOARD_PASSCODE` set, the dashboard's routes and WebSocket need the passcode and the dashboard asks for it. Unset, nothing changes.
+  - The Playwright bots accept the banner, as a real stealth bot would.
+  - Checked: 240 tests pass and the frontend builds. A headless Edge check passed 24/24: nothing sent or stored before the answer, held events sent on Accept, nothing sent after Decline, the OTP, Delete my data, the passcode and erasing from the dashboard. All three real bots were still labelled `Bot`, the stealth bot by the ML model alone.
 
 **Next**
-- Week 3 Part 6: privacy, the mocked OTP and the dashboard passcode.
+- Week 4: the analytics page, deployment setup, final metrics, the pitch deck and demo script.
 
 **Notes**
 - Teammates: run `pip install -r requirements.txt` in `backend/` again for `langgraph`.

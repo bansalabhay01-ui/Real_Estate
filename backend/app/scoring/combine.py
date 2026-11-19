@@ -141,6 +141,8 @@ def intent_points(record: dict, f: dict, signals: list[Signal]) -> list[IntentPo
     flagged = any(s.layer == JUNK for s in signals) or any(s.layer == BOT and s.strength == CERTAIN for s in signals)
     if f["leads"] and not flagged:
         add("enquiry", 10, "Sent an enquiry with valid contact details")
+    if any(lead.get("phone_verified") for lead in record.get("leads") or []):
+        add("phone_verified", 5, "Verified their phone number with an OTP")
     focus, city_focus, spread = 0, _known(f["city_focus"]), _known(f["price_spread"])
     if city_focus is not None:
         focus += 6 if city_focus == 1 else 3 if city_focus >= 0.75 else 0

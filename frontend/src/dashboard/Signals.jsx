@@ -111,6 +111,7 @@ export function LeadChecks({ lead }) {
       {failed.length === 0 && (
         <li className="text-xs text-muted">
           {checks.length ? "All checks passed" : "Not checked"}
+          {checks.some((check) => check.check === "otp") ? ". Phone verified by OTP" : ""}
           {fill ? `. ${fill.text}` : ""}
         </li>
       )}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { IconClose } from "../components/icons";
-import { getVisitor } from "../lib/api";
+import { eraseVisitor, getVisitor } from "../lib/api";
 import { formatClock, formatDateTime, formatPrice } from "../lib/format";
 import { describeEvent } from "./describe";
 import LeadBrief, { VerdictButtons } from "./LeadBrief";
@@ -50,6 +50,42 @@ function BuyerDetails({ profile }) {
       <Row label="Purpose">{purpose ?? unknown}</Row>
       <Row label="Language">{LANGUAGES[profile.language] ?? unknown}</Row>
     </dl>
+  );
+}
+
+// The right to erasure (DPDP Act 2023). Deleting can't be undone, so it asks once more.
+function EraseVisitor({ visitorId, onErased }) {
+  const [state, setState] = useState("idle"); // idle | confirming | erasing | failed
+
+  function erase() {
+    setState("erasing");
+    eraseVisitor(visitorId).then(onErased, () => setState("failed"));
+  }
+
+  if (state === "idle") {
+    return (
+      <button type="button" onClick={() => setState("confirming")} className="text-sm font-medium text-alert underline underline-offset-2">
+        Delete this visitor&apos;s data
+      </button>
+    );
+  }
+  return (
+    <div className="rounded-md border border-alert/40 p-3 text-sm">
+      <p>This permanently removes their visits, conversation, enquiries and site visits.</p>
+      {state === "failed" && (
+        <p role="alert" className="mt-1 font-medium text-alert">
+          That didn&apos;t work. Try again.
+        </p>
+      )}
+      <div className="mt-2 flex gap-2">
+        <button type="button" disabled={state === "erasing"} onClick={erase} className="rounded-md bg-alert px-3 py-1.5 font-semibold text-white disabled:opacity-60">
+          {state === "erasing" ? "Deleting..." : "Delete permanently"}
+        </button>
+        <button type="button" onClick={() => setState("idle")} className="rounded-md border border-line px-3 py-1.5 hover:bg-concrete">
+          Keep
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -213,6 +249,10 @@ export default function VisitorDetail({ visitorId, version, onClose }) {
             <span className="text-xs text-ink-soft">{userAgent ?? "None sent"}</span>
           </Row>
         </dl>
+      </Section>
+
+      <Section title="Privacy">
+        <EraseVisitor visitorId={visitor.id} onErased={onClose} />
       </Section>
     </aside>
   );

@@ -4,13 +4,14 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import select
 
+from ..auth import DASHBOARD_ONLY
 from ..db import SessionLocal
 from ..models import Feedback, Lead, Visitor
 from ..schemas import FeedbackIn, FeedbackOut
 from ..scoring.engine import publish, score_safely
 from ..utils import utcnow
 
-router = APIRouter(tags=["feedback"])
+router = APIRouter(tags=["feedback"], dependencies=DASHBOARD_ONLY)
 
 
 def _save(payload: FeedbackIn) -> FeedbackOut:

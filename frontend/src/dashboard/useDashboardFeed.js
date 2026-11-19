@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getDemoStatus, getStats, getVisitors, getVisits } from "../lib/api";
+import { dashboardPasscode, getDemoStatus, getStats, getVisitors, getVisits } from "../lib/api";
 import { WS_URL } from "../lib/config";
 
 const MAX_VISITORS = 500;
@@ -47,7 +47,8 @@ export function useDashboardFeed() {
     let stopped = false;
 
     function connect() {
-      socket = new WebSocket(`${WS_URL}/ws/dashboard`);
+      const passcode = dashboardPasscode();
+      socket = new WebSocket(`${WS_URL}/ws/dashboard${passcode ? `?passcode=${encodeURIComponent(passcode)}` : ""}`);
       socket.onopen = () => {
         attempts = 0;
         setStatus("live");

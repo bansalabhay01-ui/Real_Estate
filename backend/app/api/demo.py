@@ -25,6 +25,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import func, select
 
+from ..auth import DASHBOARD_ONLY
 from ..config import REPO_DIR
 from ..db import SessionLocal
 from ..models import Visitor
@@ -46,7 +47,7 @@ from ..scoring.engine import ScoreUpdate, broadcast_snapshot, classify_safely, p
 from ..tracking import store_event_batch, store_lead
 
 log = logging.getLogger("leadops.demo")
-router = APIRouter(prefix="/demo", tags=["demo"])
+router = APIRouter(prefix="/demo", tags=["demo"], dependencies=DASHBOARD_ONLY)
 
 SIM_PREFIX = "sim-"
 BATCH_SIZE = 50

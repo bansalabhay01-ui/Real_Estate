@@ -3,6 +3,7 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from fastapi.concurrency import run_in_threadpool
 
+from ..auth import passcode_ok
 from ..realtime import hub
 from ..tracking import list_leads, list_visitors
 
@@ -11,6 +12,9 @@ router = APIRouter(tags=["dashboard"])
 
 @router.websocket("/ws/dashboard")
 async def dashboard_feed(ws: WebSocket) -> None:
+    if not passcode_ok(ws.query_params.get("passcode")):
+        await ws.close(code=4401)
+        return
     await ws.accept()
     try:
         visitors = await run_in_threadpool(list_visitors, 50)
