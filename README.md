@@ -191,6 +191,19 @@ visit from the same device counts too. The dashboard shows a "Test" chip on thes
 6. Share `http://192.168.1.23:5173/?lo_test=genuine&lo_tester=t01`, with your laptop's address. The site finds the
    API on the same laptop by itself.
 
+**Measuring the result**
+
+When the sessions are in, run these from the repo root on the same laptop and database:
+
+```bash
+backend\.venv\Scripts\python ml/bots/run_bots.py --count 5 --api http://localhost:8000   # real bots join the same database
+backend\.venv\Scripts\python ml/evaluate.py                                               # writes docs/RESULTS.md
+```
+
+On Mac or Linux, use `backend/.venv/bin/python`. [docs/RESULTS.md](docs/RESULTS.md) keeps real people, real bots and simulated
+traffic apart, gives each share a 95% confidence interval and says so when a group has no sessions yet. Quote the real people's
+numbers when you present, because simulated traffic is the easiest test.
+
 ## The smart engagement trigger
 
 Most serious buyers leave without filling in a form. After each event batch, `backend/app/scoring/nudge.py` looks for a
