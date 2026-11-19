@@ -78,6 +78,7 @@ export const sendOffer = (visitorId) => request(`/visitors/${encodeURIComponent(
 
 // The live demo tools on the dashboard.
 export const rescoreEveryone = () => request("/scoring/rescore", { method: "POST" });
+export const getAnalytics = ({ days, simulated }) => request(`/analytics?days=${days}&simulated=${simulated}`);
 
 // Privacy and the phone check.
 export const getHealth = () => request("/health");

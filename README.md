@@ -79,6 +79,8 @@ Open http://localhost:5173 for the demo site and http://localhost:5173/dashboard
 7. On the dashboard, press **Simulate traffic**: 200 bots, 30 junk leads and 20 real buyers arrive over about 30
    seconds and are sorted live, ending with a scoreboard. **Run a real bot** opens a browser window and lets a
    Playwright bot attack the site. **Clear simulated visitors** gets the dashboard ready for the next rehearsal.
+8. Open **Analytics** (http://localhost:5173/dashboard/analytics) for the funnel from visitor to hot lead, the share of
+   enquiries filtered out, the estimated sales hours saved and traffic per day.
 
 ## Simulator
 

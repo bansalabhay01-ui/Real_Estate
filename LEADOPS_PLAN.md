@@ -431,3 +431,29 @@ As in Week 2, nothing is renamed or removed, every new field is optional, and `d
 - A visitor who says "under 50 lakh" but opens ₹1.5 Cr homes gets the budget check.
 - Deleting a visitor removes them everywhere; the clean-up removes old rows (tested); with `DASHBOARD_PASSCODE` set, the dashboard routes refuse requests without it.
 - `npm run build` passes; the new panels work at phone width.
+
+---
+
+## Week 4 Build Plan
+Week 3 finished on 19 Nov. On 18 Nov the user asked for the whole project to be completed from this plan, so Week 4 follows the main plan's list: "Deploy, build the analytics page, fix bugs. Final metrics on the real test set. PPT, a 3-minute demo video, and a README with screenshots. Rehearse."
+
+### Part 1: Analytics page (A, B)
+`/dashboard/analytics`: the funnel (visitors, real people, real contacts, Hot leads), the share of enquiries filtered out, estimated sales hours saved (6 minutes per filtered enquiry, stated on the page), buyers found by the assistant, site visits, and traffic per day. A filter row covers the period and whether simulated traffic counts. Recharts draws the daily chart, and every chart has a table view.
+
+### Part 2: Ready to deploy (B)
+`render.yaml` (backend), `frontend/vercel.json` (site) and `docs/DEPLOY.md` (the steps for Render, Vercel and Neon, which need the team's own accounts). The backend is tested against a real Postgres engine, not only SQLite.
+
+### Part 3: Final metrics (B)
+`ml/evaluate.py` measures the engine on the real test set without retraining and writes `docs/RESULTS.md`, keeping simulated numbers, real bots and real people apart. Nothing is estimated: a group with no sessions says so.
+
+### Part 4: Documents (everyone)
+`docs/ARCHITECTURE.md`, `docs/DEMO_SCRIPT.md` (a 3-minute run sheet with a backup plan) and a README with screenshots in `docs/screenshots/`.
+
+### Part 5: Pitch deck (everyone)
+`docs/LeadOps_pitch.pptx`: problem, solution, live demo, architecture, impact, business model and roadmap, with cited figures for the problem.
+
+### What only the team can do
+- **Real test sessions:** 30-50 people browsing through tester links (README, "Collecting real test sessions"), then `ml/evaluate.py`.
+- **Accounts and the deploy:** Render, Vercel and Neon, following `docs/DEPLOY.md`.
+- **One check with a real LLM key:** every LLM path has only run against fakes so far.
+- **The 3-minute demo video and at least five rehearsals.**

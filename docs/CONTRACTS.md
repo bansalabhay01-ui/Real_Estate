@@ -171,6 +171,7 @@ is outside the next 60 days, `404` for an unknown home.
 | `GET /visitors/{id}/brief` | `{lines: [three strings], next_step: {text, urgency: "now" / "today" / "this_week" / "none", action: "call" / "offer" / "whatsapp" / "review" / "confirm_visit" / "none"}, mode: "llm" / "template"}` | C |
 | `POST /visitors/{id}/followup` | `{channel: "whatsapp" / "email", language: "auto" / "en" / "hinglish" / "hi" / "mr"}` returns a draft: `{channel, language, subject, text, mode, whatsapp_number, whatsapp_url, email, mailto_url}` | C |
 | `GET /stats` | `{visitors, active_now, leads, chatting_visitors, labels, assistant_leads, offers_sent, offers_accepted, model_version, model_verdicts}` for the dashboard; `labels` counts visitors per label, e.g. `{"Hot": 4, "Bot": 120}` | B |
+| `GET /analytics?days=14&simulated=true` | the analytics page: `{days, include_simulated, visitors, funnel: [{step, label, count}], labels, enquiries, enquiries_filtered, hours_saved, minutes_per_enquiry, found_by_assistant, offers_sent, offers_accepted, site_visits, daily: [{day, kept, junk, bots}]}`, for visitors first seen in the period | B |
 | `POST /scoring/rescore` | reload the model (after `ml/train.py`) and relabel every visitor in the background: `{"ok": true, "visitors": 512}` | B |
 | `GET /listings?city=&bhk=&min_price=&max_price=&q=` | listings | B |
 | `GET /listings/{id}` | one listing | B |
@@ -189,7 +190,7 @@ is outside the next 60 days, `404` for an unknown home.
 | `GET /health` | `{status, llm, listings, model, retention_days, dashboard_locked}`; `model` is the scoring model's version, or `fallback` | B |
 
 **Dashboard passcode.** When the backend has `DASHBOARD_PASSCODE` set, these need it in the `X-LeadOps-Passcode` header (`401`
-otherwise): `/stats`, every `/visitors` route, `GET /leads`, `GET /leads/{id}`, `GET` and `PATCH /visits`, `/feedback`, `/demo/*`,
+otherwise): `/stats`, `/analytics`, every `/visitors` route, `GET /leads`, `GET /leads/{id}`, `GET` and `PATCH /visits`, `/feedback`, `/demo/*`,
 `/scoring/rescore` and `/auth/check`. The WebSocket takes it as `?passcode=`. `POST /events`, `POST /leads`, `POST /chat`,
 `POST /visits`, `/listings` and `/sdk` stay open, because visitors use them.
 

@@ -220,6 +220,38 @@ class StatsOut(BaseModel):
     model_verdicts: int = 0  # how many sales verdicts that model learned from
 
 
+class FunnelStep(BaseModel):
+    step: str  # visitors / people / contacts / hot
+    label: str
+    count: int
+
+
+class DailyTraffic(BaseModel):
+    day: date
+    kept: int  # people worth the sales team's time: Cold, Warm, Hot and Review
+    junk: int
+    bots: int
+
+
+class AnalyticsOut(BaseModel):
+    """The analytics page. Everything counts visitors first seen in the chosen period."""
+
+    days: int
+    include_simulated: bool
+    visitors: int
+    funnel: list[FunnelStep]
+    labels: dict[str, int]
+    enquiries: int
+    enquiries_filtered: int  # enquiries from visitors labelled Bot or Junk
+    hours_saved: float  # an estimate: enquiries_filtered x minutes_per_enquiry
+    minutes_per_enquiry: int
+    found_by_assistant: int
+    offers_sent: int
+    offers_accepted: int
+    site_visits: int
+    daily: list[DailyTraffic]
+
+
 class RescoreOut(BaseModel):
     ok: bool = True
     visitors: int  # how many visitors are being rescored

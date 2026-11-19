@@ -1,9 +1,13 @@
+import { lazy, Suspense } from "react";
 import { Link, Route, Routes } from "react-router";
 import SiteLayout from "./components/SiteLayout";
 import Dashboard from "./pages/Dashboard";
 import Home from "./pages/Home";
 import Privacy from "./pages/Privacy";
 import Property from "./pages/Property";
+
+// The charts are the heaviest code here, so buyers on the demo site never download them.
+const Analytics = lazy(() => import("./pages/Analytics"));
 
 function NotFound() {
   return (
@@ -26,8 +30,16 @@ export default function App() {
         <Route path="privacy" element={<Privacy />} />
         <Route path="*" element={<NotFound />} />
       </Route>
-      {/* The sales team's view (never tracked). */}
+      {/* The sales team's views (never tracked). */}
       <Route path="dashboard" element={<Dashboard />} />
+      <Route
+        path="dashboard/analytics"
+        element={
+          <Suspense fallback={<p className="p-8 text-sm text-muted">Opening the analytics...</p>}>
+            <Analytics />
+          </Suspense>
+        }
+      />
     </Routes>
   );
 }

@@ -6,11 +6,12 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
 
 from ..ai.brief import build_brief, build_followup
+from ..analytics import build_analytics
 from ..auth import DASHBOARD_ONLY, PASSCODE_HEADER, passcode_ok
 from ..db import SessionLocal
 from ..models import Visitor
 from ..retention import erase_visitors
-from ..schemas import AccessOut, BriefOut, ErasedOut, FollowUpIn, FollowUpOut, NudgeOut, RescoreOut, StatsOut, VisitorDetailOut, VisitorOut
+from ..schemas import AccessOut, AnalyticsOut, BriefOut, ErasedOut, FollowUpIn, FollowUpOut, NudgeOut, RescoreOut, StatsOut, VisitorDetailOut, VisitorOut
 from ..scoring.engine import broadcast_snapshot, rescore_all
 from ..scoring.nudge import OfferRefused, queue_offer
 from ..tracking import dashboard_stats, list_visitors, visitor_detail
@@ -49,6 +50,15 @@ async def erase_visitor(visitor_id: str, request: Request) -> ErasedOut:
 def get_stats() -> StatsOut:
     """Headline numbers for the dashboard, including visitors per label."""
     return dashboard_stats()
+
+
+@router.get("/analytics", response_model=AnalyticsOut)
+def get_analytics(
+    days: int = Query(14, ge=1, le=90, description="visitors first seen in the last this many days"),
+    simulated: bool = Query(True, description="count the visitors made by Simulate traffic"),
+) -> AnalyticsOut:
+    """The funnel, what was filtered out, the sales time that saved and traffic per day."""
+    return build_analytics(days, simulated)
 
 
 @router.get("/visitors", response_model=list[VisitorOut])

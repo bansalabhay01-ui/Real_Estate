@@ -3,17 +3,17 @@
 A short diary of LeadOps work sessions, newest first. Claude saves each session by itself: whenever a piece of work is finished, and at the start of the next session if the last one wasn't saved. Each save updates this file, commits, and pushes to GitHub.
 
 ## Current status
-_Last updated: 2026-11-18_
+_Last updated: 2026-11-19_
 
-- **Phase:** Week 3 (Integration + Wow) is finished, all six parts. Week 4 (polish, deploy and pitch) is next. Deadline about 30 Nov 2026.
-- **Done:** the Week 1 foundation (demo property site, tracking SDK, FastAPI backend, a basic property assistant in English, Hinglish and Hindi, the live sales dashboard, the traffic simulator, the shared contracts draft), all of Week 2 ("Week 2 Build Plan" in `LEADOPS_PLAN.md`: tester links, simulator v2, features and rules, the LightGBM human check with SHAP, intent points, labels and reasons, dashboard v1, three real Playwright bots, LLM extraction and visitor type) and all of Week 3: the dashboard's Simulate traffic button with a live scoreboard and Run a real bot; the assistant as a LangGraph agent with brochure answers, EMIs, site visits and Marathi; the smart engagement trigger that turns serious anonymous visitors into leads; the lead brief with a next step, follow-up drafts in the buyer's language, one-click site visits and sales verdicts; the says-versus-does checks and retraining that learns from sales verdicts; consent before tracking, data retention and erasure, a mocked OTP and a dashboard passcode. 240 tests pass.
-- **Next:** Week 4: the analytics page, deployment setup, final metrics, the pitch deck and demo script. Classmates can start test sessions now (README, "Collecting real test sessions"); the real test set has no human sessions yet.
+- **Phase:** Week 3 (Integration + Wow) is finished, all six parts. Week 4 (polish, deploy and pitch) is in progress: the analytics page is done. Deadline about 30 Nov 2026.
+- **Done:** the Week 1 foundation (demo property site, tracking SDK, FastAPI backend, a basic property assistant in English, Hinglish and Hindi, the live sales dashboard, the traffic simulator, the shared contracts draft), all of Week 2 ("Week 2 Build Plan" in `LEADOPS_PLAN.md`: tester links, simulator v2, features and rules, the LightGBM human check with SHAP, intent points, labels and reasons, dashboard v1, three real Playwright bots, LLM extraction and visitor type) and all of Week 3: the dashboard's Simulate traffic button with a live scoreboard and Run a real bot; the assistant as a LangGraph agent with brochure answers, EMIs, site visits and Marathi; the smart engagement trigger that turns serious anonymous visitors into leads; the lead brief with a next step, follow-up drafts in the buyer's language, one-click site visits and sales verdicts; the says-versus-does checks and retraining that learns from sales verdicts; consent before tracking, data retention and erasure, a mocked OTP and a dashboard passcode. Week 4 so far: the analytics page. 247 tests pass.
+- **Next:** Week 4: deployment setup, final metrics, the documents and the pitch deck ("Week 4 Build Plan" in `LEADOPS_PLAN.md`). Classmates can start test sessions now (README, "Collecting real test sessions"); the real test set has no human sessions yet.
 - **Blocked:** the LLM features haven't been tried with a real API key (the user hasn't approved spending it); template mode and the keyword rules work, and Claude's request shape matches the API reference.
 - **Code:** https://github.com/bansalabhay01-ui/Real_Estate (branch `main`)
 
 ---
 
-## 2026-11-18 · bansalabhay01-ui · Week 3 build
+## 2026-11-18 · bansalabhay01-ui · Week 3 build and Week 4
 
 **Done**
 - The user said to complete the project from the plan and push after each task, which lifts the 16 Nov pause on saving. The plan's recommended decisions apply: ask for consent before tracking, Marathi as the regional language, and the contract additions as listed. No real LLM key is used.
@@ -50,9 +50,11 @@ _Last updated: 2026-11-18_
   - `backend/app/auth.py`: with `DASHBOARD_PASSCODE` set, the dashboard's routes and WebSocket need the passcode and the dashboard asks for it. Unset, nothing changes.
   - The Playwright bots accept the banner, as a real stealth bot would.
   - Checked: 240 tests pass and the frontend builds. A headless Edge check passed 24/24: nothing sent or stored before the answer, held events sent on Accept, nothing sent after Decline, the OTP, Delete my data, the passcode and erasing from the dashboard. All three real bots were still labelled `Bot`, the stealth bot by the ML model alone.
+- **Week 4 plan:** "Week 4 Build Plan" at the end of `LEADOPS_PLAN.md`, including what only the team can do.
+- **Week 4 Part 1, analytics page:** `/dashboard/analytics` (`frontend/src/pages/Analytics.jsx`, `backend/app/analytics.py`, `GET /analytics`): the share of enquiries filtered out, estimated sales hours saved (6 minutes per filtered enquiry, stated on the page), buyers found by the assistant, site visits, the funnel from visitor to Hot lead, visitors by label and a Recharts chart of visitors per day with a table view. The period and simulated traffic can be filtered. The charts load only on this page, so buyers on the demo site never download them. Checked: 247 tests pass, the frontend builds and a headless Edge check passed 10/10.
 
 **Next**
-- Week 4: the analytics page, deployment setup, final metrics, the pitch deck and demo script.
+- Week 4: deployment setup, final metrics, the documents and the pitch deck.
 
 **Notes**
 - Teammates: run `pip install -r requirements.txt` in `backend/` again for `langgraph`.
