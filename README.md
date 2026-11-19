@@ -38,6 +38,7 @@ Measured by `ml/evaluate.py`. The details are in [docs/RESULTS.md](docs/RESULTS.
 | `docs/ARCHITECTURE.md` | how the system fits together | everyone |
 | `docs/DEMO_SCRIPT.md` | the 3-minute run sheet, the backup plan and likely questions | everyone |
 | `docs/DEPLOY.md` | putting it online with Neon, Render and Vercel | everyone |
+| `docs/LeadOps_pitch.pptx` | the pitch deck, with sources and speaker notes | everyone |
 
 ## Run it
 
