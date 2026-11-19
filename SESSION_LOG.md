@@ -5,9 +5,9 @@ A short diary of LeadOps work sessions, newest first. Claude saves each session 
 ## Current status
 _Last updated: 2026-11-18_
 
-- **Phase:** Week 3 (Integration + Wow) in progress: Parts 1-4 of 6 done. Deadline about 30 Nov 2026.
-- **Done:** the Week 1 foundation (demo property site, tracking SDK, FastAPI backend, a basic property assistant in English, Hinglish and Hindi, the live sales dashboard, the traffic simulator, the shared contracts draft), all of Week 2 ("Week 2 Build Plan" in `LEADOPS_PLAN.md`: tester links, simulator v2, features and rules, the LightGBM human check with SHAP, intent points, labels and reasons, dashboard v1, three real Playwright bots, LLM extraction and visitor type) and Week 3 Parts 1-4: the dashboard's Simulate traffic button with a live scoreboard and Run a real bot; the assistant as a LangGraph agent with brochure answers, EMIs, site visits and Marathi; the smart engagement trigger that turns serious anonymous visitors into leads; the lead brief with a next step, follow-up drafts in the buyer's language, one-click site visits and sales verdicts. 204 tests pass.
-- **Next:** Week 3 Part 5: the consistency check and learning from sales verdicts. Classmates can start test sessions now (README, "Collecting real test sessions"); the real test set has no human sessions yet.
+- **Phase:** Week 3 (Integration + Wow) in progress: Parts 1-5 of 6 done. Deadline about 30 Nov 2026.
+- **Done:** the Week 1 foundation (demo property site, tracking SDK, FastAPI backend, a basic property assistant in English, Hinglish and Hindi, the live sales dashboard, the traffic simulator, the shared contracts draft), all of Week 2 ("Week 2 Build Plan" in `LEADOPS_PLAN.md`: tester links, simulator v2, features and rules, the LightGBM human check with SHAP, intent points, labels and reasons, dashboard v1, three real Playwright bots, LLM extraction and visitor type) and Week 3 Parts 1-5: the dashboard's Simulate traffic button with a live scoreboard and Run a real bot; the assistant as a LangGraph agent with brochure answers, EMIs, site visits and Marathi; the smart engagement trigger that turns serious anonymous visitors into leads; the lead brief with a next step, follow-up drafts in the buyer's language, one-click site visits and sales verdicts; the says-versus-does checks and retraining that learns from sales verdicts. 216 tests pass.
+- **Next:** Week 3 Part 6: privacy (consent, retention, erasure), the mocked OTP and the dashboard passcode. Classmates can start test sessions now (README, "Collecting real test sessions"); the real test set has no human sessions yet.
 - **Blocked:** the LLM features haven't been tried with a real API key (the user hasn't approved spending it); template mode and the keyword rules work, and Claude's request shape matches the API reference.
 - **Code:** https://github.com/bansalabhay01-ui/Real_Estate (branch `main`)
 
@@ -38,9 +38,14 @@ _Last updated: 2026-11-18_
   - Sales verdicts count at once: Fake makes a visitor `Junk`; Genuine and Converted overrule the rules and the model, leaving the intent score to decide. The latest verdict is kept on the visitor and shown as a chip and in the enquiries table.
   - Dashboard: `frontend/src/dashboard/LeadBrief.jsx` opens the visitor panel with the brief, the next step, an editable follow-up draft (Copy, Open in WhatsApp, Open in email), one-click site-visit booking, Send an offer now and the verdict buttons.
   - Checked: 204 tests pass and the frontend builds. A headless Edge check passed 15/15. It found one bug, now fixed: screen-reader labels inside wide tables made the whole page scroll sideways on phones.
+- **Part 5, consistency check and learning from verdicts:**
+  - `backend/app/scoring/consistency.py` compares what a visitor says with what they do: budget, city and BHK against the homes they opened (three homes at least), and "to live in" against "investment". It shows under "Why this label" and in the brief, and never changes the label.
+  - `ml/train.py` reads the sales verdicts. Genuine and Converted join the training data at five times the weight. Fake counts as a bot only when nothing else explains it: a broker or a made-up number is a person with bad details, and shouldn't teach the human check. It reports how the model that was running did on those visitors, saves the counts in `model_info.json` and, with 20 or more verdicts, prints suggested intent points for the team to review.
+  - Dashboard: the model version, how many verdicts it learned from, and a **Relabel everyone** button.
+  - Checked: 216 tests pass and the frontend builds. A headless Edge check passed 7/7. A real training run on throwaway data learned from 17 of 22 marked visitors, wrote to a scratch folder and left the committed model unchanged.
 
 **Next**
-- Week 3 Part 5: the consistency check and learning from sales verdicts.
+- Week 3 Part 6: privacy, the mocked OTP and the dashboard passcode.
 
 **Notes**
 - Teammates: run `pip install -r requirements.txt` in `backend/` again for `langgraph`.

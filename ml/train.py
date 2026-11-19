@@ -11,6 +11,9 @@ What it does:
   4. Measures the whole scoring engine (rules + model) on the real test set: visitors in the database who came
      through a tester link (README, "Collecting real test sessions"). Simulated scores run high; this is the number
      that counts.
+  5. Learns from the sales team: visitors marked Genuine, Converted or Fake on the dashboard join the training data
+     with extra weight, and the report shows how the model that was running did on them. With 20 or more verdicts it
+     also suggests new intent points, for the team to review. Nothing about the points changes by itself.
 Needs backend/requirements.txt and ml/requirements.txt in the backend's virtual environment.
 """
 
@@ -34,11 +37,16 @@ from sklearn.model_selection import train_test_split  # noqa: E402
 
 from app.ai.classify import classify  # noqa: E402
 from app.ai.extract import profile_from_messages  # noqa: E402
-from app.scoring.combine import score_record  # noqa: E402
+from app.scoring.combine import NOT_BUYERS, score_record  # noqa: E402
 from app.scoring.features import MODEL_FEATURES, add_network_counts, cut_record, model_vector, visitor_features  # noqa: E402
-from app.scoring.model import DEFAULT_THRESHOLDS, INFO_FILE_NAME, MODEL_DIR, MODEL_FILE_NAME, HumanModel  # noqa: E402
+from app.scoring.model import DEFAULT_THRESHOLDS, INFO_FILE_NAME, MODEL_DIR, MODEL_FILE_NAME, HumanModel, load_model  # noqa: E402
+from app.scoring.rules import JUNK, evaluate  # noqa: E402
 
 LABELS = ["Bot", "Junk", "Review", "Cold", "Warm", "Hot"]
+VERDICT_WEIGHT = 5.0  # a salesperson's verdict on a real visitor counts for more than one simulated visitor
+MIN_VERDICTS_FOR_POINTS = 20
+INTENT_POINTS_NOW = {"property_time": 20, "repeat_visits": 15, "shared_details": 15, "emi": 12, "floor_plan": 12, "enquiry": 10,
+                     "focused_search": 10, "filters": 6, "site_visit": 15}  # fmt: skip
 # Monotone constraints keep the model's logic sensible and its SHAP explanations intuitive: a bot signal can only
 # ever push towards "bot" (+1), a human one only towards "person" (-1). Features that cut both ways stay free (0):
 # lots of pages can be a scraper or a broker, and a scroll straight to the bottom is a script, not a person.
@@ -153,6 +161,70 @@ def real_test_set(model: HumanModel) -> list[tuple[str, str]] | None:
     return rows
 
 
+def load_verdicts() -> list[dict]:
+    """The visitors the sales team has judged on the dashboard, as records training can use."""
+    from app.config import settings
+
+    if settings.database_url.startswith("sqlite:///"):
+        if not Path(settings.database_url.removeprefix("sqlite:///")).exists():
+            return []
+    from app.db import SessionLocal, init_db
+    from app.models import Visitor
+    from app.scoring.engine import known_type, load_record
+    from sqlalchemy import select
+
+    init_db()  # adds any new columns, as the backend does at startup
+    found = []
+    with SessionLocal() as db:
+        query = select(Visitor.id, Visitor.feedback_label, Visitor.visitor_type).where(Visitor.feedback_label.is_not(None))
+        for visitor_id, verdict, saved_type in db.execute(query).all():
+            record = load_record(db, visitor_id)
+            record.update(verdict=verdict, saved_type=known_type(saved_type), kind="sales_verdict",
+                          label="bot" if verdict == "fake" else "genuine")  # fmt: skip
+            found.append(record)
+    return found
+
+
+def trainable_verdicts(verdicts: list[dict]) -> list[dict]:
+    """What the human-check model can learn from. Genuine and Converted show what real people look like. Fake only
+    counts as a bot when nothing else explains it: a broker or a made-up phone number is a person with bad details,
+    and teaching the model that their browsing looks robotic would make it worse."""
+    keep = []
+    for record in verdicts:
+        if record["verdict"] != "fake":
+            keep.append(record)
+            continue
+        has_bad_details = any(signal.layer == JUNK for signal in evaluate(record, visitor_features(record)))
+        if not has_bad_details and (record.get("saved_type") or {}).get("type") not in NOT_BUYERS:
+            keep.append(record)
+    return keep
+
+
+def verdict_rows(verdicts: list[dict], model: HumanModel) -> list[tuple[str, str]]:
+    """How this model labels the visitors the sales team has judged, leaving the verdict itself out of it."""
+    return [("junk (sales verdict)" if record["verdict"] == "fake" else "genuine (sales verdict)",
+             score_record(record, model=model, visitor_type=record.get("saved_type")).label) for record in verdicts]  # fmt: skip
+
+
+def suggested_intent_points(verdicts: list[dict], model: HumanModel) -> dict | None:
+    """With enough verdicts: which buying signals really separate good leads from fake ones, as suggested points."""
+    good = [record for record in verdicts if record["verdict"] != "fake"]
+    fake = [record for record in verdicts if record["verdict"] == "fake"]
+    if len(verdicts) < MIN_VERDICTS_FOR_POINTS or not good or not fake:
+        return None
+
+    def average(group: list[dict], signal: str) -> float:
+        return sum(point.points for record in group for point in score_record(record, model=model).points if point.signal == signal) / len(group)
+
+    suggested = {}
+    for signal, now in INTENT_POINTS_NOW.items():
+        good_average, fake_average = average(good, signal), average(fake, signal)
+        lift = (good_average + 1) / (fake_average + 1)
+        suggested[signal] = {"now": now, "suggested": round(now * max(0.5, min(1.5, lift))),
+                             "average_good_lead": round(good_average, 1), "average_fake_lead": round(fake_average, 1)}  # fmt: skip
+    return suggested
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Train LeadOps' ML human check (LightGBM).")
     parser.add_argument("--data", default=str(ROOT / "ml" / "data" / "sessions.jsonl"), help="simulator output (JSONL)")
@@ -173,9 +245,19 @@ def main() -> int:
     print(f"Training on {len(train)} visitors ({len(x_train)} rows with the cut-short copies); "
           f"checking on {len(test)} unseen visitors ({len(x_test)} rows)")
 
+    running_model = load_model()  # the model in use until now, judged on verdicts it has never trained on
+    verdicts = load_verdicts()
+    teaching = trainable_verdicts(verdicts)
+    weights = [1.0] * len(x_train)
+    if teaching:
+        x_verdicts, y_verdicts = rows_for(teaching, rng, args.cuts)
+        x_train, y_train = x_train + x_verdicts, y_train + y_verdicts
+        weights += [VERDICT_WEIGHT] * len(x_verdicts)
+    print(f"Sales verdicts: {len(verdicts)} in the database, learning from {len(teaching)}")
+
     features = list(MODEL_FEATURES)
     PARAMS["monotone_constraints"] = [MONOTONE.get(name, 0) for name in features]
-    train_set = lgb.Dataset(np.array(x_train, dtype=float), label=y_train, feature_name=features, free_raw_data=False)
+    train_set = lgb.Dataset(np.array(x_train, dtype=float), label=y_train, weight=weights, feature_name=features, free_raw_data=False)
     test_set = lgb.Dataset(np.array(x_test, dtype=float), label=y_test, reference=train_set)
     booster = lgb.train(PARAMS, train_set, num_boost_round=400, valid_sets=[test_set],
                         callbacks=[lgb.early_stopping(30, verbose=False)])
@@ -220,6 +302,19 @@ def main() -> int:
         real_headline = None
         print("\nNo real test set yet: no tester-link visitors in the database (README, 'Collecting real test sessions').")
 
+    verdict_headline, points = None, None
+    if verdicts:
+        judged = verdict_rows(verdicts, running_model)
+        print_confusion(f"The model that was running, on {len(verdicts)} sales-verified visitors:", confusion(judged))
+        verdict_headline = headline(judged)
+        print("  " + ", ".join(f"{name.replace('_', ' ')} {value:.1%}" for name, value in verdict_headline.items() if value is not None))
+        points = suggested_intent_points(verdicts, running_model)
+    if points:
+        print("\nSuggested intent points, from how good and fake leads differ (for the team to review, nothing is changed):")
+        print(f"  {'signal':16}{'now':>6}{'suggested':>11}{'good lead':>11}{'fake lead':>11}")
+        for signal, row in points.items():
+            print(f"  {signal:16}{row['now']:>6}{row['suggested']:>11}{row['average_good_lead']:>11}{row['average_fake_lead']:>11}")
+
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     (out / MODEL_FILE_NAME).write_text(model_text, encoding="utf-8", newline="\n")  # LightGBM counts bytes: keep \n
@@ -227,9 +322,12 @@ def main() -> int:
         "trained_at": datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z"),
         "lightgbm": lgb.__version__, "trees": booster.best_iteration, "params": PARAMS,
         "data": {"file": data.name, "visitors": len(records), "by_label": dict(Counter(r["label"] for r in records)),
-                 "train_rows": len(x_train), "test_rows": len(x_test)},
+                 "train_rows": len(x_train), "test_rows": len(x_test),
+                 "sales_verdicts": {**dict(Counter(record["verdict"] for record in verdicts)), "trained_on": len(teaching)}},
         "metrics": {"model_on_unseen_simulated": model_metrics, "engine_on_unseen_simulated": simulated,
-                    "engine_on_real_test_set": real_headline, "real_test_set_size": len(real or [])},
+                    "engine_on_real_test_set": real_headline, "real_test_set_size": len(real or []),
+                    "engine_on_sales_verdicts": verdict_headline},
+        "suggested_intent_points": points,
         "importance": importance,
     })  # fmt: skip
     (out / INFO_FILE_NAME).write_text(json.dumps(info, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")

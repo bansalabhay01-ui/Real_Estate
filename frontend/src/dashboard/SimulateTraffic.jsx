@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { clearSimulated, runBot, startSimulation } from "../lib/api";
+import { clearSimulated, rescoreEveryone, runBot, startSimulation } from "../lib/api";
 import { LABELS } from "./describe";
 import { LabelBadge } from "./Signals";
 
@@ -94,12 +94,13 @@ function Scoreboard({ board }) {
 }
 
 // The live attack demo: send a burst of labelled traffic or a real bot, and watch the dashboard sort it.
-export default function SimulateTraffic({ demo }) {
+export default function SimulateTraffic({ demo, stats }) {
   const dialogRef = useRef(null);
   const [numbers, setNumbers] = useState({ bots: 200, junk: 30, genuine: 20 });
   const [botKind, setBotKind] = useState("stealth");
   const [problem, setProblem] = useState(null);
   const [clearing, setClearing] = useState(false);
+  const [relabelled, setRelabelled] = useState(false);
 
   const running = Boolean(demo?.running);
   const botRunning = Boolean(demo?.bot_running);
@@ -124,6 +125,15 @@ export default function SimulateTraffic({ demo }) {
     setClearing(true);
     await attempt(clearSimulated);
     setClearing(false);
+  }
+
+  // After retraining: load the new model and label everyone again.
+  function relabel() {
+    attempt(async () => {
+      await rescoreEveryone();
+      setRelabelled(true);
+      setTimeout(() => setRelabelled(false), 4000);
+    });
   }
 
   const buttonOutline = "rounded-md border border-ink px-3 py-2 text-sm font-semibold hover:bg-ink hover:text-white disabled:border-line disabled:text-muted disabled:hover:bg-transparent";
@@ -214,6 +224,20 @@ export default function SimulateTraffic({ demo }) {
       )}
 
       {!running && demo?.scoreboard && <Scoreboard board={demo.scoreboard} />}
+
+      {stats && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line pt-3 text-xs text-muted">
+          <span>
+            Human-check model <span className="font-medium text-ink-soft">{stats.model_version}</span>
+            {stats.model_verdicts > 0
+              ? `, learned from ${stats.model_verdicts} sales ${stats.model_verdicts === 1 ? "verdict" : "verdicts"}`
+              : ""}
+          </span>
+          <button type="button" onClick={relabel} className="font-medium text-blueprint underline underline-offset-2 hover:text-blueprint-deep">
+            {relabelled ? "Relabelling..." : "Relabel everyone"}
+          </button>
+        </div>
+      )}
 
       <dialog
         ref={dialogRef}

@@ -216,6 +216,8 @@ class StatsOut(BaseModel):
     assistant_leads: int = 0  # enquiries that came from an offer by the assistant
     offers_sent: int = 0  # offers that reached a visitor's browser
     offers_accepted: int = 0
+    model_version: str = "fallback"  # the human-check model in use
+    model_verdicts: int = 0  # how many sales verdicts that model learned from
 
 
 class RescoreOut(BaseModel):

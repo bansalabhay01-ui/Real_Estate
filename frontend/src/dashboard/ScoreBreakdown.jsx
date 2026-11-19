@@ -1,3 +1,4 @@
+import { IconAlert, IconCheck } from "../components/icons";
 import { formatFeature } from "./describe";
 import { Chip, IntentMeter, LabelBadge } from "./Signals";
 
@@ -103,6 +104,30 @@ function SignalList({ signals }) {
 
 const TYPE_NAMES = { end_buyer: "End buyer", investor: "Investor", tenant: "Tenant", broker: "Broker", spam: "Spam" };
 
+// What the visitor said against what they did. A mismatch is a question for the call, so it never changes the label.
+function SaysVersusDoes({ checks }) {
+  if (!checks?.length) return null;
+  return (
+    <Block title="Says versus does" aside="Doesn't change the label">
+      <ul className="flex flex-col gap-1.5 text-xs">
+        {checks.map((check) => (
+          <li key={check.check} className="flex items-start gap-1.5">
+            {check.ok ? (
+              <IconCheck className="mt-0.5 size-3.5 shrink-0 text-ok" />
+            ) : (
+              <IconAlert className="mt-0.5 size-3.5 shrink-0 text-amber" />
+            )}
+            <span className={check.ok ? "text-ink-soft" : "font-medium text-ink"}>
+              <span className="sr-only">{check.ok ? "Matches: " : "Ask about this: "}</span>
+              {check.text}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </Block>
+  );
+}
+
 export default function ScoreBreakdown({ score, detail, hasEnquiry }) {
   if (!score || !detail) {
     return <p className="text-sm text-muted">Not scored yet. Scoring starts with the visitor&apos;s first page view.</p>;
@@ -156,6 +181,8 @@ export default function ScoreBreakdown({ score, detail, hasEnquiry }) {
           </p>
         )}
       </Block>
+
+      <SaysVersusDoes checks={detail.consistency} />
 
       <Block title="Intent" aside={`${score.intent_score} of 100 points`}>
         <IntentPoints points={detail.intent?.points} />

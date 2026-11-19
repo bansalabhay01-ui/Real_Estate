@@ -373,3 +373,120 @@ def test_the_latest_verdict_wins(client):
     client.post("/feedback", json={"visitor_id": visitor_id, "label": "fake"})
     client.post("/feedback", json={"visitor_id": visitor_id, "label": "genuine"})
     assert visitor_now(client, visitor_id)["label"] != "Junk"
+
+
+# ---------------------------------------------------------------- says versus does
+
+from app.scoring.consistency import consistency_checks  # noqa: E402
+
+
+def looked_at(*homes):
+    return [{"events": [{"type": "property_view", "ts": index, "path": f"/property/{home}", "props": {"listing_id": home}} for index, home in enumerate(homes)]}]
+
+
+def by_check(record):
+    return {item["check"]: item for item in consistency_checks(record)}
+
+
+def test_a_budget_that_doesnt_match_the_homes_opened():
+    found = by_check({"profile": {"budget_max": 5_000_000}, "sessions": looked_at("MUM-001", "BLR-001", "NOI-001")})
+    assert found["budget"]["ok"] is False and "Says under ₹50 L" in found["budget"]["text"] and "₹1.6" in found["budget"]["text"]
+    found = by_check({"profile": {"budget_min": 25_000_000}, "sessions": looked_at("MUM-004", "NOI-003", "PUN-004")})
+    assert found["budget"]["ok"] is False and "Says above ₹2.5 Cr" in found["budget"]["text"]
+
+
+def test_a_budget_that_fits():
+    found = by_check({"profile": {"budget_max": 9_000_000}, "sessions": looked_at("PUN-002", "PUN-003", "PUN-004")})
+    assert found["budget"]["ok"] is True
+
+
+def test_city_and_bhk_mismatches():
+    found = by_check({"profile": {"city": "Pune", "bhk": 4}, "sessions": looked_at("MUM-001", "MUM-002", "NOI-003")})
+    assert found["city"] == {"check": "city", "ok": False, "text": "Says Pune but opened homes only in Mumbai, Noida"}
+    assert found["bhk"]["ok"] is False and "2 BHK" in found["bhk"]["text"]
+
+
+def test_two_homes_are_too_few_to_judge():
+    assert consistency_checks({"profile": {"city": "Pune", "budget_max": 5_000_000, "bhk": 4}, "sessions": looked_at("MUM-001", "MUM-002")}) == []
+
+
+def test_saying_both_to_live_in_and_to_invest():
+    chat = [{"text": "It is for my family to live in"}, {"text": "What rental yield can I expect from this investment?"}]
+    assert by_check({"profile": {}, "sessions": [], "chat": chat})["purpose"]["ok"] is False
+    assert "purpose" not in by_check({"profile": {}, "sessions": [], "chat": chat[:1]})
+
+
+def test_mismatches_come_first():
+    checks = consistency_checks({"profile": {"city": "Mumbai", "bhk": 4}, "sessions": looked_at("MUM-001", "MUM-002", "MUM-004")})
+    assert [item["ok"] for item in checks] == [False, True]
+
+
+def test_a_mismatch_shows_but_never_changes_the_label(client):
+    visitor_id, session_id = str(uuid.uuid4()), str(uuid.uuid4())
+    post(client, visitor_id, session_id, browsing(1_790_000_000_000, homes=("MUM-001", "BLR-001", "NOI-001"), emi=False))
+    before = client.get(f"/visitors/{visitor_id}").json()["visitor"]["label"]
+    client.post("/chat", json={"visitor_id": visitor_id, "session_id": session_id, "message": "I need something under 50 lakh"})
+    detail = client.get(f"/visitors/{visitor_id}").json()
+    budget = next(item for item in detail["score_detail"]["consistency"] if item["check"] == "budget")
+    assert budget["ok"] is False and detail["visitor"]["label"] == before
+    assert "Ask about this" in client.get(f"/visitors/{visitor_id}/brief").json()["lines"][2]
+
+
+# ---------------------------------------------------------------- learning from the sales team
+
+
+@pytest.fixture(scope="module")
+def trainer():
+    pytest.importorskip("sklearn")
+    pytest.importorskip("lightgbm")
+    import importlib.util
+
+    from app.config import REPO_DIR
+
+    spec = importlib.util.spec_from_file_location("leadops_train", REPO_DIR / "ml" / "train.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def judged(verdict, **extra):
+    good_lead = {"name": "Priya Kulkarni", "phone": "9822012345", "email": "priya.k@gmail.com", "message": "Please call me", "form_fill_ms": 40_000, "client_ts": 2}
+    return {"visitor_id": str(uuid.uuid4()), "user_agent": HEADERS["User-Agent"], "context": CONTEXT, "verdict": verdict, "kind": "sales_verdict",
+            "label": "bot" if verdict == "fake" else "genuine", "sessions": [{"session_id": "s", "ip": "198.18.0.9", "events": browsing(1_000_000)}],
+            "leads": [good_lead], "chat": [], "profile": {}, "network": {"ip_visitors": 1, "phone_visitors": 1}, **extra}  # fmt: skip
+
+
+def test_good_verdicts_teach_the_model_what_people_look_like(trainer):
+    records = [judged("genuine"), judged("converted")]
+    assert trainer.trainable_verdicts(records) == records
+
+
+def test_a_fake_lead_with_believable_details_counts_as_a_bot(trainer):
+    fake = judged("fake")
+    assert trainer.trainable_verdicts([fake]) == [fake]
+
+
+def test_a_person_with_bad_details_does_not_teach_the_human_check(trainer):
+    made_up_number = judged("fake", leads=[{"name": "Priya Kulkarni", "phone": "9999999999", "message": "", "form_fill_ms": 40_000, "client_ts": 2}])
+    broker = judged("fake", saved_type={"type": "broker", "confidence": 0.9})
+    assert trainer.trainable_verdicts([made_up_number, broker]) == []
+
+
+def test_verdicts_are_reported_without_the_verdict_deciding(trainer):
+    from app.scoring.model import load_model
+
+    rows = trainer.verdict_rows([judged("genuine"), judged("fake")], load_model())
+    assert rows[0][0] == "genuine (sales verdict)" and rows[1][0] == "junk (sales verdict)"
+    assert rows[1][1] != "Junk"  # believable details: the engine alone has no reason to call it junk
+
+
+def test_intent_points_are_suggested_only_with_enough_verdicts(trainer):
+    from app.scoring.model import load_model
+
+    model = load_model()
+    few = [judged("genuine"), judged("fake")]
+    assert trainer.suggested_intent_points(few, model) is None
+    many = [judged("genuine") for _ in range(12)] + [judged("fake", sessions=[]) for _ in range(10)]
+    suggested = trainer.suggested_intent_points(many, model)
+    assert suggested["property_time"]["suggested"] > suggested["property_time"]["now"]  # good leads spent far longer on homes
+    assert suggested["filters"]["suggested"] == suggested["filters"]["now"]  # nobody used the filters: no evidence either way

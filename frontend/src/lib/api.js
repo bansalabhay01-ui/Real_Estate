@@ -53,6 +53,7 @@ export const sendVerdict = (fields) => request("/feedback", { method: "POST", bo
 export const sendOffer = (visitorId) => request(`/visitors/${encodeURIComponent(visitorId)}/nudge`, { method: "POST" });
 
 // The live demo tools on the dashboard.
+export const rescoreEveryone = () => request("/scoring/rescore", { method: "POST" });
 export const getDemoStatus = () => request("/demo/status");
 export const startSimulation = (numbers) => request("/demo/simulate", { method: "POST", body: numbers });
 export const clearSimulated = () => request("/demo/simulated", { method: "DELETE" });

@@ -16,6 +16,7 @@ from datetime import date
 
 from ..listings import format_price, get_listing
 from ..utils import short_day
+from .consistency import consistency_checks
 from .explain import human_factors, reasons_for, summary_line
 from .features import visitor_features
 from .model import HumanCheck, HumanModel, current_model
@@ -45,6 +46,7 @@ class ScoreResult:
     thresholds: dict
     features: dict = field(repr=False)
     visitor_type: dict | None = None
+    consistency: list[dict] = field(default_factory=list)  # says versus does: shown to sales, never changes the label
 
     def as_json(self) -> dict:
         """What engine.py saves on the visitor: the summary the API returns, plus the full breakdown."""
@@ -63,6 +65,7 @@ class ScoreResult:
                 "intent": {"score": self.intent_score,
                            "points": [{"signal": p.signal, "points": p.points, "detail": p.detail} for p in self.points]},
                 "visitor_type": self.visitor_type,
+                "consistency": self.consistency,
                 "thresholds": self.thresholds,
             },
         }  # fmt: skip
@@ -194,4 +197,4 @@ def score_record(record: dict, *, model: HumanModel | None = None, visitor_type:
                           visitor_type=visitor_type, verdict=verdict)
     return ScoreResult(label=label, intent_score=intent, human=human, signals=signals, points=points, reasons=reasons,
                        summary=summary_line(label, reasons), thresholds=dict(model.thresholds), features=f,
-                       visitor_type=visitor_type)
+                       visitor_type=visitor_type, consistency=consistency_checks(record))

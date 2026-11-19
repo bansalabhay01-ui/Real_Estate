@@ -125,6 +125,10 @@ Every event batch, enquiry and chat message rescores its visitor, in a few milli
   assistant, EMI calculator, floor plan, a valid enquiry, a focused search and the filters. Cold < 40, Warm 40-70,
   Hot > 70.
 
+- **Says versus does** (`consistency.py`): the stated budget, city, BHK and purpose against the homes the visitor
+  actually opened. A mismatch is a question for the sales call and never changes the label.
+- **Sales verdicts**: Genuine, Fake and Converted on the dashboard overrule all of the above at once.
+
 `GET /visitors/{id}` returns the whole breakdown as `score_detail` (docs/CONTRACTS.md, section 6).
 
 **Training the model.** The trained model is committed (`backend/data/model/`), so you only retrain after
@@ -136,11 +140,16 @@ python ml/simulator.py --bots 800 --junk 400 --genuine 800
 backend\.venv\Scripts\python ml/train.py
 ```
 
-Then restart the backend, or relabel everyone without a restart: `POST /scoring/rescore` (open
-http://localhost:8000/docs, find it and press "Try it out").
+Then restart the backend, or press **Relabel everyone** on the dashboard to load the new model without a restart.
 
 `ml/train.py` prints how the model and the whole engine do on simulated visitors it never saw, and on the real
 test set (tester-link visitors in your database). Simulated numbers run high; the real test set is what counts.
+
+**Learning from the sales team.** Training also reads the verdicts in your database. Genuine and Converted visitors
+join the training data with extra weight. A Fake visitor counts as a bot only when nothing else explains it, because a
+broker or a made-up number is a real person with bad details. With 20 or more verdicts, `ml/train.py` also prints
+suggested intent points for the team to review; it never changes them by itself.
+
 `python ml/simulator.py --send http://localhost:8000 --report` sends fresh traffic to a running backend and prints
 how each kind of visitor was labelled.
 

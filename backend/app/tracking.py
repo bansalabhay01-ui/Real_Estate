@@ -32,6 +32,7 @@ from .schemas import (
     VisitorOut,
     VisitUpdate,
 )
+from .scoring.model import current_model
 from .scoring.rules import check_phone, lead_checks
 from .utils import automation_hints, device_from_ua, short_day, today_ist, utcnow
 
@@ -344,6 +345,8 @@ def update_site_visit(visit_id: int, change: VisitUpdate) -> VisitOut | None:
 
 def dashboard_stats(active_minutes: int = 2) -> StatsOut:
     cutoff = utcnow() - timedelta(minutes=active_minutes)
+    model = current_model()
+    learned_from = ((model.info.get("data") or {}).get("sales_verdicts") or {}).get("trained_on", 0)
     with SessionLocal() as db:
         count = select(func.count()).select_from(Visitor)
         return StatsOut(
@@ -359,6 +362,8 @@ def dashboard_stats(active_minutes: int = 2) -> StatsOut:
             assistant_leads=db.scalar(select(func.count()).select_from(Lead).where(Lead.source == "assistant_offer")) or 0,
             offers_sent=db.scalar(select(func.count()).select_from(Nudge).where(Nudge.status != "pending")) or 0,
             offers_accepted=db.scalar(select(func.count()).select_from(Nudge).where(Nudge.status == "accepted")) or 0,
+            model_version=model.version,
+            model_verdicts=learned_from,
         )
 
 

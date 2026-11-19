@@ -411,7 +411,7 @@ export default function Dashboard() {
 
         <div className="mt-6">
           <Panel id="demo-heading" title="Live demo" note="Send an attack and watch LeadOps sort it.">
-            <SimulateTraffic demo={demo} />
+            <SimulateTraffic demo={demo} stats={stats} />
           </Panel>
         </div>
 

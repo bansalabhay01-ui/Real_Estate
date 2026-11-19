@@ -165,7 +165,7 @@ is outside the next 60 days, `404` for an unknown home.
 | `POST /visitors/{id}/nudge` | "Send an offer now": queue an offer that reaches the browser with the visitor's next event batch. `201` with the offer; `409` if they already shared contact details or are labelled Bot or Junk | B |
 | `GET /visitors/{id}/brief` | `{lines: [three strings], next_step: {text, urgency: "now" / "today" / "this_week" / "none", action: "call" / "offer" / "whatsapp" / "review" / "confirm_visit" / "none"}, mode: "llm" / "template"}` | C |
 | `POST /visitors/{id}/followup` | `{channel: "whatsapp" / "email", language: "auto" / "en" / "hinglish" / "hi" / "mr"}` returns a draft: `{channel, language, subject, text, mode, whatsapp_number, whatsapp_url, email, mailto_url}` | C |
-| `GET /stats` | `{visitors, active_now, leads, chatting_visitors, labels, assistant_leads, offers_sent, offers_accepted}` for the dashboard; `labels` counts visitors per label, e.g. `{"Hot": 4, "Bot": 120}` | B |
+| `GET /stats` | `{visitors, active_now, leads, chatting_visitors, labels, assistant_leads, offers_sent, offers_accepted, model_version, model_verdicts}` for the dashboard; `labels` counts visitors per label, e.g. `{"Hot": 4, "Bot": 120}` | B |
 | `POST /scoring/rescore` | reload the model (after `ml/train.py`) and relabel every visitor in the background: `{"ok": true, "visitors": 512}` | B |
 | `GET /listings?city=&bhk=&min_price=&max_price=&q=` | listings | B |
 | `GET /listings/{id}` | one listing | B |
@@ -260,9 +260,13 @@ site visit (15), capped at 100. `VisitorDetailOut` also lists the visitor's `sit
                          "contribution": 2.1, "towards": "bot"}]},
   "intent": {"score": 82, "points": [{"signal": "emi", "points": 12, "detail": "Checked the EMI on a ₹85 L home"}]},
   "visitor_type": {"type": "investor", "confidence": 0.7, "reason": "Buying as an investment", "source": "keywords"},
+  "consistency": [{"check": "budget", "ok": false, "text": "Says under ₹50 L but opened homes around ₹1.6 Cr"}],
   "thresholds": {"bot": 0.2, "review": 0.5}
 }
 ```
+
+`consistency` compares what the visitor said with what they did (`budget`, `city`, `bhk`, `purpose`), mismatches first. It
+needs at least three opened homes and never changes the label.
 
 `factors` are SHAP values from the model (log-odds, positive pushes towards "bot"), the eight strongest. The
 `scores` table keeps every label change: `label`, `human_prob`, `intent_score`, `reasons`, `model_version`.
