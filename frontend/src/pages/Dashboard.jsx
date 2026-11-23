@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
-import { PlanMark } from "../components/icons";
 import { LABEL_INFO, LABELS } from "../dashboard/describe";
 import { IntentMeter, LabelBadge, LeadChecks, shortId, SignalChips } from "../dashboard/Signals";
 import SimulateTraffic from "../dashboard/SimulateTraffic";
 import { useDashboardFeed, useFilteredVisitors } from "../dashboard/useDashboardFeed";
 import VisitorDetail from "../dashboard/VisitorDetail";
-import PasscodeGate from "../dashboard/PasscodeGate";
+import PasscodeGate, { SalesHeader } from "../dashboard/PasscodeGate";
 import { sendVerdict, updateVisit } from "../lib/api";
 import { profilePhrases, timeAgo } from "../lib/format";
 
@@ -19,18 +18,18 @@ const HOT_ALERT_MS = 12_000;
 
 function StatTile({ label, value }) {
   return (
-    <div className="rounded-lg border border-line bg-white px-4 py-3">
+    <div className="rounded-[18px] border border-line bg-white px-5 py-4">
       <dt className="text-sm text-muted">{label}</dt>
-      <dd className="tabular mt-1 text-3xl font-semibold">{value ?? "-"}</dd>
+      <dd className="tabular mt-1 text-3xl font-medium tracking-[-0.03em]">{value ?? "-"}</dd>
     </div>
   );
 }
 
 function Panel({ id, title, note, children }) {
   return (
-    <section aria-labelledby={id} className="min-w-0 rounded-lg border border-line bg-white">
+    <section aria-labelledby={id} className="min-w-0 rounded-[20px] border border-line bg-white">
       <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-line px-4 py-3">
-        <h2 id={id} className="font-wide text-lg font-semibold">
+        <h2 id={id} className="text-lg font-medium tracking-[-0.02em]">
           {title}
         </h2>
         {note && <p className="text-sm text-muted">{note}</p>}
@@ -60,7 +59,7 @@ function VisitorFilters({ filter, onFilter, sort, onSort, stats }) {
               onClick={() => onFilter(name)}
               title={name === "All" ? "Every visitor" : LABEL_INFO[name]}
               className={`rounded-full border px-3 py-1 text-sm ${
-                selected ? "border-blueprint bg-blueprint text-white" : "border-line bg-white text-ink hover:bg-concrete"
+                selected ? "border-night bg-night text-white" : "border-line bg-white text-ink hover:bg-concrete"
               }`}
             >
               {name} <span className={`tabular ${selected ? "text-white/80" : "text-muted"}`}>{count ?? "-"}</span>
@@ -73,7 +72,7 @@ function VisitorFilters({ filter, onFilter, sort, onSort, stats }) {
         <select
           value={sort}
           onChange={(event) => onSort(event.target.value)}
-          className="rounded border border-line bg-white px-2 py-1 text-ink"
+          className="rounded-full border border-line bg-white px-3 py-1 text-ink"
         >
           <option value="recent">Latest activity</option>
           <option value="intent">Highest intent</option>
@@ -223,7 +222,7 @@ function LeadsTable({ leads, onSelect, now }) {
                   id={`verdict-${lead.id}`}
                   value={lead.verdict ?? ""}
                   onChange={(event) => event.target.value && sendVerdict({ lead_id: lead.id, label: event.target.value }).catch(() => {})}
-                  className="rounded border border-line bg-white px-1.5 py-1 text-xs"
+                  className="rounded-full border border-line bg-white px-2.5 py-1 text-xs"
                 >
                   <option value="">Choose</option>
                   <option value="genuine">Genuine</option>
@@ -286,7 +285,7 @@ function VisitsTable({ visits, onSelect }) {
                     key={status}
                     type="button"
                     onClick={() => updateVisit(visit.id, { status }).catch(() => {})}
-                    className="ml-1.5 rounded border border-line px-2 py-1 text-xs font-medium hover:bg-concrete"
+                    className="ml-1.5 rounded-full border border-line px-3 py-1 text-xs font-medium hover:bg-concrete"
                   >
                     {text}
                   </button>
@@ -313,7 +312,7 @@ function HotAlert({ alerts, onView, onDismiss }) {
   return (
     <div role="status" aria-live="polite" className="fixed bottom-4 right-4 z-20 w-[min(360px,calc(100vw-2rem))]">
       {latest && (
-        <div className="rounded-lg border border-blueprint/40 bg-white p-4 shadow-lg">
+        <div className="rounded-[18px] border border-blueprint/30 bg-white p-4 shadow-2xl shadow-ink/20">
           <p className="flex flex-wrap items-center gap-2 font-semibold">
             {latest.found ? (
               <>Found by the assistant: visitor {shortId(latest.visitorId)}</>
@@ -336,14 +335,14 @@ function HotAlert({ alerts, onView, onDismiss }) {
                 onView(latest.visitorId);
                 onDismiss(latest.visitorId);
               }}
-              className="rounded bg-blueprint px-3 py-1.5 text-sm font-semibold text-white hover:bg-blueprint-deep"
+              className="rounded-full bg-blueprint px-4 py-1.5 text-sm font-medium text-white hover:bg-blueprint-deep"
             >
               View
             </button>
             <button
               type="button"
               onClick={() => onDismiss(latest.visitorId)}
-              className="rounded border border-line px-3 py-1.5 text-sm hover:bg-concrete"
+              className="rounded-full border border-line px-4 py-1.5 text-sm hover:bg-concrete"
             >
               Dismiss
             </button>
@@ -376,9 +375,6 @@ function SalesDashboard() {
   }, []);
   useEffect(() => {
     document.title = "Sales dashboard | LeadOps";
-    return () => {
-      document.title = "LeadOps Realty (demo)";
-    };
   }, []);
 
   const order = sort === "intent" ? "Highest intent first." : "Most recent activity first.";
@@ -386,29 +382,14 @@ function SalesDashboard() {
 
   return (
     <div className="min-h-dvh">
-      <header className="bg-ink text-white">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3">
-          <div className="flex items-center gap-2.5">
-            <PlanMark />
-            <span className="font-extra-wide text-lg font-bold">LeadOps</span>
-            <span className="text-white/70">Sales dashboard</span>
-          </div>
-          <div className="flex items-center gap-5 text-sm">
-            <span className="flex items-center gap-2" role="status">
-              <span className={`size-2.5 rounded-full ${STATUS[status].dot}`} aria-hidden="true" />
-              {STATUS[status].text}
-            </span>
-            <Link to="/dashboard/analytics" className="font-medium text-white/80 underline-offset-4 hover:text-white hover:underline">
-              Analytics
-            </Link>
-            <Link to="/demo" className="font-medium text-white/80 underline-offset-4 hover:text-white hover:underline">
-              Open the demo site
-            </Link>
-          </div>
-        </div>
-      </header>
+      <SalesHeader title="Sales dashboard">
+        <span className="flex items-center gap-2 text-sm" role="status">
+          <span className={`size-2.5 rounded-full ${STATUS[status].dot}`} aria-hidden="true" />
+          {STATUS[status].text}
+        </span>
+      </SalesHeader>
 
-      <main className="mx-auto max-w-7xl px-4 py-6">
+      <main className="mx-auto max-w-[1376px] px-4 py-6 sm:px-6">
         <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
           <StatTile label="Visitors" value={stats?.visitors} />
           <StatTile label="Active in the last 2 minutes" value={stats?.active_now} />

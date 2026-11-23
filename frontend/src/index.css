@@ -64,14 +64,6 @@
   line-height: 1.6;
 }
 
-/* Until the property site and the dashboard are restyled, their old width classes keep a display feel. */
-@utility font-wide {
-  letter-spacing: -0.015em;
-}
-@utility font-extra-wide {
-  letter-spacing: -0.03em;
-}
-
 @layer base {
   html {
     color: var(--color-ink);

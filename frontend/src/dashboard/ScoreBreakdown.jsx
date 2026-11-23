@@ -6,7 +6,7 @@ const MAX_ITEM_POINTS = 20; // the largest single intent item (time on property 
 
 function Block({ title, aside, children }) {
   return (
-    <div className="rounded-md border border-line p-3">
+    <div className="rounded-[14px] border border-line p-3">
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
         <h4 className="text-sm font-semibold">{title}</h4>
         {aside && <p className="text-xs text-muted">{aside}</p>}

@@ -28,8 +28,8 @@ const SLOTS = [
   ["evening", "Evening"],
 ];
 
-const smallButton = "rounded-md border border-line bg-white px-2.5 py-1.5 text-sm font-medium hover:bg-concrete disabled:text-muted";
-const mainButton = "rounded-md bg-ink px-3 py-1.5 text-sm font-semibold text-white hover:bg-ink-soft disabled:opacity-60";
+const smallButton = "rounded-full border border-line bg-white px-3.5 py-1.5 text-sm font-medium hover:bg-concrete disabled:text-muted";
+const mainButton = "rounded-full bg-night px-4 py-1.5 text-sm font-medium text-white hover:bg-night-2 disabled:opacity-60";
 
 function Problem({ children }) {
   return children ? (
@@ -75,9 +75,9 @@ function FollowUp({ visitorId }) {
   // The address is encoded too, so an enquiry's "email" like "a@b.in?bcc=x@y.in" can't add recipients.
   const email = draft?.email ? `mailto:${encodeURIComponent(draft.email).replace(/%40/g, "@")}?subject=${encodeURIComponent(draft.subject)}&body=${encodeURIComponent(text)}` : null;
   return (
-    <div className="mt-2 flex flex-col gap-2 rounded-md border border-line p-3">
+    <div className="mt-2 flex flex-col gap-2 rounded-[14px] border border-line p-3">
       <div className="flex flex-wrap items-center gap-2">
-        <div role="group" aria-label="Send by" className="flex overflow-hidden rounded-md border border-line text-sm">
+        <div role="group" aria-label="Send by" className="flex overflow-hidden rounded-full border border-line text-sm">
           {[["whatsapp", "WhatsApp"], ["email", "Email"]].map(([value, name]) => (
             <button
               key={value}
@@ -97,7 +97,7 @@ function FollowUp({ visitorId }) {
           id="followup-language"
           value={language}
           onChange={(event) => setLanguage(event.target.value)}
-          className="rounded-md border border-line bg-white px-2 py-1 text-sm"
+          className="rounded-full border border-line bg-white px-3 py-1 text-sm"
         >
           {LANGUAGES.map(([value, name]) => (
             <option key={value} value={value}>
@@ -120,7 +120,7 @@ function FollowUp({ visitorId }) {
             value={state === "loading" ? "Writing a draft..." : text}
             readOnly={state === "loading"}
             onChange={(event) => setText(event.target.value)}
-            className="w-full rounded-md border border-line px-2.5 py-2 text-sm focus:border-blueprint"
+            className="w-full rounded-[12px] border border-line px-3 py-2 text-sm focus:border-blueprint"
           />
           <div className="flex flex-wrap gap-2">
             <button type="button" disabled={state !== "ready"} onClick={copy} className={smallButton}>
@@ -165,11 +165,11 @@ function BookVisit({ visitorId, listingId, onBooked }) {
   }
 
   return (
-    <div className="mt-2 rounded-md border border-line p-3">
+    <div className="mt-2 rounded-[14px] border border-line p-3">
       <div className="flex flex-wrap items-end gap-2">
         <label className="flex flex-col gap-1 text-xs font-medium text-ink-soft">
           Day
-          <select value={day} onChange={(event) => setDay(event.target.value)} className="rounded-md border border-line bg-white px-2 py-1 text-sm">
+          <select value={day} onChange={(event) => setDay(event.target.value)} className="rounded-full border border-line bg-white px-3 py-1 text-sm">
             {choices.map((choice) => (
               <option key={choice.value} value={choice.value}>
                 {choice.text}
@@ -179,7 +179,7 @@ function BookVisit({ visitorId, listingId, onBooked }) {
         </label>
         <label className="flex flex-col gap-1 text-xs font-medium text-ink-soft">
           Time
-          <select value={slot} onChange={(event) => setSlot(event.target.value)} className="rounded-md border border-line bg-white px-2 py-1 text-sm">
+          <select value={slot} onChange={(event) => setSlot(event.target.value)} className="rounded-full border border-line bg-white px-3 py-1 text-sm">
             {SLOTS.map(([value, name]) => (
               <option key={value} value={value}>
                 {name}
@@ -221,7 +221,7 @@ export function VerdictButtons({ visitorId, leadId, current, onSaved }) {
             aria-pressed={current === value}
             onClick={() => save(value)}
             className={`rounded-full border px-3 py-1 text-sm ${
-              current === value ? "border-blueprint bg-blueprint text-white" : "border-line bg-white hover:bg-concrete"
+              current === value ? "border-night bg-night text-white" : "border-line bg-white hover:bg-concrete"
             }`}
           >
             {name}
@@ -237,7 +237,7 @@ export function VerdictButtons({ visitorId, leadId, current, onSaved }) {
         onChange={(event) => setNote(event.target.value)}
         maxLength={300}
         placeholder="Add a note (optional)"
-        className="mt-2 w-full rounded-md border border-line px-2.5 py-1.5 text-sm focus:border-blueprint"
+        className="mt-2 w-full rounded-full border border-line px-3.5 py-1.5 text-sm focus:border-blueprint"
       />
       <Problem>{problem}</Problem>
     </div>
@@ -317,7 +317,7 @@ export default function LeadBrief({ detail, onChanged }) {
               <li key={line}>{line}</li>
             ))}
           </ul>
-          <p className={`rounded-md border px-3 py-2 text-sm ${urgency.tone}`}>
+          <p className={`rounded-[14px] border px-3.5 py-2.5 text-sm ${urgency.tone}`}>
             <span className="block text-xs font-semibold text-ink-soft">{urgency.text}</span>
             <span className="font-semibold">{step.text}</span>
           </p>

@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { PlanMark } from "../components/icons";
 import { LABEL_INFO, LABELS } from "../dashboard/describe";
-import PasscodeGate from "../dashboard/PasscodeGate";
+import PasscodeGate, { SalesHeader } from "../dashboard/PasscodeGate";
 import { LabelBadge } from "../dashboard/Signals";
 import { getAnalytics } from "../lib/api";
 
@@ -22,9 +21,9 @@ const percent = (part, whole) => (whole ? Math.round((part / whole) * 100) : 0);
 
 function Tile({ label, value, note }) {
   return (
-    <div className="rounded-lg border border-line bg-white px-4 py-3">
+    <div className="rounded-[18px] border border-line bg-white px-5 py-4">
       <dt className="text-sm text-muted">{label}</dt>
-      <dd className="mt-1 text-3xl font-semibold">{value}</dd>
+      <dd className="mt-1 text-3xl font-medium tracking-[-0.03em]">{value}</dd>
       <dd className="mt-1 text-xs text-muted">{note}</dd>
     </div>
   );
@@ -32,8 +31,8 @@ function Tile({ label, value, note }) {
 
 function Card({ id, title, note, children }) {
   return (
-    <section aria-labelledby={id} className="min-w-0 rounded-lg border border-line bg-white p-4">
-      <h2 id={id} className="font-wide text-lg font-semibold">
+    <section aria-labelledby={id} className="min-w-0 rounded-[20px] border border-line bg-white p-5">
+      <h2 id={id} className="text-lg font-medium tracking-[-0.02em]">
         {title}
       </h2>
       {note && <p className="mt-0.5 text-sm text-muted">{note}</p>}
@@ -77,7 +76,7 @@ function DayTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   const row = payload[0].payload;
   return (
-    <div className="rounded-md border border-line bg-white px-3 py-2 text-sm shadow-lg">
+    <div className="rounded-[12px] border border-line bg-white px-3 py-2 text-sm shadow-lg">
       <p className="mb-1 text-xs text-muted">{label}</p>
       <ul className="flex flex-col gap-0.5">
         {[...SERIES].reverse().map((series) => (
@@ -198,9 +197,6 @@ function AnalyticsPage() {
 
   useEffect(() => {
     document.title = "Analytics | LeadOps";
-    return () => {
-      document.title = "LeadOps Realty (demo)";
-    };
   }, []);
 
   useEffect(() => {
@@ -219,28 +215,11 @@ function AnalyticsPage() {
     };
   }, [days, simulated]);
 
-  const link = "font-medium text-white/80 underline-offset-4 hover:text-white hover:underline";
   return (
     <div className="min-h-dvh">
-      <header className="bg-ink text-white">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3">
-          <div className="flex items-center gap-2.5">
-            <PlanMark />
-            <span className="font-extra-wide text-lg font-bold">LeadOps</span>
-            <span className="text-white/70">Analytics</span>
-          </div>
-          <nav aria-label="Sales tools" className="flex items-center gap-5 text-sm">
-            <Link to="/dashboard" className={link}>
-              Sales dashboard
-            </Link>
-            <Link to="/demo" className={link}>
-              Open the demo site
-            </Link>
-          </nav>
-        </div>
-      </header>
+      <SalesHeader title="Analytics" />
 
-      <main className="mx-auto max-w-7xl px-4 py-6">
+      <main className="mx-auto max-w-[1376px] px-4 py-6 sm:px-6">
         <div className="mb-5 flex flex-wrap items-center gap-x-6 gap-y-3">
           <div role="group" aria-label="Period" className="flex gap-1.5">
             {PERIODS.map((period) => (
@@ -249,7 +228,7 @@ function AnalyticsPage() {
                 type="button"
                 aria-pressed={days === period}
                 onClick={() => setDays(period)}
-                className={`rounded-full border px-3 py-1 text-sm ${days === period ? "border-blueprint bg-blueprint text-white" : "border-line bg-white hover:bg-concrete"}`}
+                className={`rounded-full border px-3 py-1 text-sm ${days === period ? "border-night bg-night text-white" : "border-line bg-white hover:bg-concrete"}`}
               >
                 Last {period} days
               </button>
@@ -263,7 +242,7 @@ function AnalyticsPage() {
 
         {state === "failed" && !data && <p className="text-sm">The analytics couldn&apos;t load. Check that the API is running.</p>}
         {data && data.visitors === 0 && (
-          <p className="rounded-lg border border-line bg-white px-4 py-10 text-center text-sm text-muted">
+          <p className="rounded-[20px] border border-line bg-white px-4 py-10 text-center text-sm text-muted">
             No visitors in this period yet. Press Simulate traffic on the{" "}
             <Link to="/dashboard" className="font-medium text-blueprint underline underline-offset-2">
               sales dashboard

@@ -40,8 +40,8 @@ function LabelCounts({ labels }) {
 
 function Result({ value, total, text }) {
   return (
-    <div className="rounded-md border border-line px-4 py-3">
-      <p className="tabular text-3xl font-semibold">
+    <div className="rounded-[16px] border border-line px-4 py-3">
+      <p className="tabular text-3xl font-medium tracking-[-0.03em]">
         {value}
         <span className="text-lg font-normal text-muted">/{total}</span>
       </p>
@@ -136,7 +136,7 @@ export default function SimulateTraffic({ demo, stats }) {
     });
   }
 
-  const buttonOutline = "rounded-md border border-ink px-3 py-2 text-sm font-semibold hover:bg-ink hover:text-white disabled:border-line disabled:text-muted disabled:hover:bg-transparent";
+  const buttonOutline = "rounded-full border border-ink px-4 py-2 text-sm font-medium hover:bg-night hover:text-white disabled:border-line disabled:text-muted disabled:hover:bg-transparent";
 
   return (
     <div className="flex flex-col gap-4 p-4">
@@ -145,7 +145,7 @@ export default function SimulateTraffic({ demo, stats }) {
           type="button"
           disabled={running}
           onClick={() => dialogRef.current?.showModal()}
-          className="rounded-md bg-marigold px-4 py-2 text-sm font-semibold text-ink hover:bg-[#e09500] disabled:opacity-60"
+          className="rounded-full bg-marigold px-5 py-2 text-sm font-medium text-night hover:bg-marigold-deep disabled:opacity-60"
         >
           {running ? "Simulating..." : "Simulate traffic"}
         </button>
@@ -159,7 +159,7 @@ export default function SimulateTraffic({ demo, stats }) {
             value={botKind}
             disabled={!demo?.bot_available || botRunning}
             onChange={(event) => setBotKind(event.target.value)}
-            className="rounded-md border border-line bg-white px-2 py-2 text-sm disabled:text-muted"
+            className="rounded-full border border-line bg-white px-3 py-2 text-sm disabled:text-muted"
           >
             {Object.entries(BOT_KINDS).map(([kind, name]) => (
               <option key={kind} value={kind}>
@@ -242,11 +242,11 @@ export default function SimulateTraffic({ demo, stats }) {
       <dialog
         ref={dialogRef}
         aria-labelledby="simulate-heading"
-        className="m-auto w-[min(420px,calc(100vw-2rem))] rounded-lg border border-line bg-white p-5 text-ink backdrop:bg-ink/50"
+        className="m-auto w-[min(420px,calc(100vw-2rem))] rounded-[22px] border border-line bg-white p-6 text-ink backdrop:bg-night/60"
       >
         <form onSubmit={start} className="flex flex-col gap-4">
           <div>
-            <h3 id="simulate-heading" className="font-wide text-lg font-semibold">
+            <h3 id="simulate-heading" className="text-xl font-medium tracking-[-0.02em]">
               Simulate traffic
             </h3>
             <p className="mt-1 text-sm text-muted">The visitors arrive over about 30 seconds and are sorted as they come in.</p>
@@ -262,16 +262,16 @@ export default function SimulateTraffic({ demo, stats }) {
                   required
                   value={numbers[key]}
                   onChange={(event) => setNumbers((current) => ({ ...current, [key]: Number(event.target.value) }))}
-                  className="tabular w-full rounded-md border border-line px-2 py-1.5 text-base text-ink focus:border-blueprint"
+                  className="tabular w-full rounded-[10px] border border-line px-2.5 py-1.5 text-base text-ink focus:border-blueprint"
                 />
               </label>
             ))}
           </div>
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={() => dialogRef.current?.close()} className="rounded-md border border-line px-3 py-2 text-sm hover:bg-concrete">
+            <button type="button" onClick={() => dialogRef.current?.close()} className="rounded-full border border-line px-4 py-2 text-sm hover:bg-concrete">
               Cancel
             </button>
-            <button type="submit" className="rounded-md bg-marigold px-4 py-2 text-sm font-semibold text-ink hover:bg-[#e09500]">
+            <button type="submit" className="rounded-full bg-marigold px-5 py-2 text-sm font-medium text-night hover:bg-marigold-deep">
               Start
             </button>
           </div>

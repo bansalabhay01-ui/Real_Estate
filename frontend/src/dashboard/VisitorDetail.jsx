@@ -13,7 +13,7 @@ const LANGUAGES = { en: "English", hinglish: "Hinglish", hi: "Hindi", mr: "Marat
 function Section({ title, children }) {
   return (
     <section className="border-t border-line pt-4">
-      <h3 className="mb-2 text-sm font-semibold text-ink-soft">{title}</h3>
+      <h3 className="mb-2 font-mono text-[12px] text-muted">{title}</h3>
       {children}
     </section>
   );
@@ -70,7 +70,7 @@ function EraseVisitor({ visitorId, onErased }) {
     );
   }
   return (
-    <div className="rounded-md border border-alert/40 p-3 text-sm">
+    <div className="rounded-[14px] border border-alert/40 p-3 text-sm">
       <p>This permanently removes their visits, conversation, enquiries and site visits.</p>
       {state === "failed" && (
         <p role="alert" className="mt-1 font-medium text-alert">
@@ -78,10 +78,10 @@ function EraseVisitor({ visitorId, onErased }) {
         </p>
       )}
       <div className="mt-2 flex gap-2">
-        <button type="button" disabled={state === "erasing"} onClick={erase} className="rounded-md bg-alert px-3 py-1.5 font-semibold text-white disabled:opacity-60">
+        <button type="button" disabled={state === "erasing"} onClick={erase} className="rounded-full bg-alert px-4 py-1.5 font-medium text-white disabled:opacity-60">
           {state === "erasing" ? "Deleting..." : "Delete permanently"}
         </button>
-        <button type="button" onClick={() => setState("idle")} className="rounded-md border border-line px-3 py-1.5 hover:bg-concrete">
+        <button type="button" onClick={() => setState("idle")} className="rounded-full border border-line px-4 py-1.5 hover:bg-concrete">
           Keep
         </button>
       </div>
@@ -89,7 +89,7 @@ function EraseVisitor({ visitorId, onErased }) {
   );
 }
 
-const panelClass = "self-start rounded-lg border border-line bg-white p-5 xl:sticky xl:top-6";
+const panelClass = "self-start rounded-[20px] border border-line bg-white p-5 xl:sticky xl:top-6";
 
 export default function VisitorDetail({ visitorId, version, onClose }) {
   const [detail, setDetail] = useState(null);
@@ -135,7 +135,7 @@ export default function VisitorDetail({ visitorId, version, onClose }) {
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 id="visitor-heading" className="flex flex-wrap items-center gap-2 font-wide text-lg font-semibold">
+          <h2 id="visitor-heading" className="flex flex-wrap items-center gap-2 text-lg font-medium tracking-[-0.02em]">
             Visitor {shortId(visitor.id)} <LabelBadge label={visitor.label} />
           </h2>
           <p className="text-sm text-muted">
@@ -143,7 +143,7 @@ export default function VisitorDetail({ visitorId, version, onClose }) {
             {visitor.session_count === 1 ? "visit" : "visits"} on {visitor.device}.
           </p>
         </div>
-        <button type="button" onClick={onClose} className="rounded p-1 hover:bg-concrete" aria-label="Close visitor details">
+        <button type="button" onClick={onClose} className="rounded-full p-1.5 hover:bg-concrete" aria-label="Close visitor details">
           <IconClose className="size-5" />
         </button>
       </div>
@@ -179,7 +179,7 @@ export default function VisitorDetail({ visitorId, version, onClose }) {
         <Section title="Enquiries">
           <ul className="flex flex-col gap-3 text-sm">
             {leads.map((lead) => (
-              <li key={lead.id} className="rounded-md border border-line p-3">
+              <li key={lead.id} className="rounded-[14px] border border-line p-3">
                 <p className="font-semibold">
                   {lead.name}, {lead.phone}
                 </p>
