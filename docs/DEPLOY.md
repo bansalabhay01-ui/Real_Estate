@@ -40,6 +40,7 @@ If Render says Python 3.14.6 isn't available, set `PYTHON_VERSION` to the newest
 
 Open your Vercel address and go through this list:
 
+- [ ] Your Vercel address opens the LeadOps front page, and **Try the live demo** opens the property site at `/demo`.
 - [ ] The privacy banner appears on the demo site. Press **Accept**.
 - [ ] Ask the assistant "What's the payment plan at Aranya Courtyard?" and get an answer from the brochure.
 - [ ] `/dashboard` asks for the passcode and opens with it. The status at the top right says **Live**.

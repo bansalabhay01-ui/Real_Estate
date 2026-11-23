@@ -15,7 +15,7 @@ A session is one run of Claude Code. Save sessions without being asked:
 - `PROMPTS.md` is filled automatically by a hook (`.claude/hooks/log-prompt.mjs`). Never edit or reformat it; it is committed with each save.
 
 ## Stack
-- **Frontend:** React (Vite) + Tailwind + shadcn/ui + Recharts. One app: demo site at `/`, sales dashboard at `/dashboard`.
+- **Frontend:** React (Vite) + Tailwind + shadcn/ui + Recharts. One app: the LeadOps front page at `/`, the demo property site at `/demo` (homes at `/property/:id`), the sales dashboard at `/dashboard`.
 - **SDK:** plain-JS `sdk/leadops.js`, served by the backend at `/sdk/leadops.js`.
 - **Backend:** FastAPI + SQLAlchemy + WebSockets. SQLite in development; Postgres (Neon/Supabase) in production through `DATABASE_URL`.
 - **GenAI:** LangChain/LangGraph agent; RAG over the listings, plus ChromaDB for brochures later.
@@ -24,7 +24,7 @@ A session is one run of Claude Code. Save sessions without being asked:
 
 ## Folder map
 This folder is the repo root. Shared JSON shapes are in `docs/CONTRACTS.md` (code: `backend/app/schemas.py`).
-- `frontend/`: demo site, dashboard, chat widget
+- `frontend/`: front page (`src/landing/`), demo site, dashboard, chat widget
 - `sdk/`: embeddable tracking script and `demo.html`
 - `backend/app/api/`: routes
 - `backend/app/scoring/`: rules, features, model, combine, explain
@@ -37,7 +37,7 @@ This folder is the repo root. Shared JSON shapes are in `docs/CONTRACTS.md` (cod
 Windows paths shown; on Mac/Linux use `.venv/bin/python`.
 - Backend, from `backend/`: `.venv\Scripts\python -m uvicorn app.main:app --reload` (http://localhost:8000, docs at `/docs`)
 - Backend tests, from `backend/`: `.venv\Scripts\python -m pytest` (temporary database, template mode, no LLM calls)
-- Frontend, from `frontend/`: `npm run dev` (http://localhost:5173, dashboard at `/dashboard`); `npm run build` checks it compiles
+- Frontend, from `frontend/`: `npm run dev` (http://localhost:5173: front page at `/`, demo site at `/demo`, dashboard at `/dashboard`); `npm run build` checks it compiles
 - Simulator, from the repo root: `python ml/simulator.py` (writes `ml/data/sessions.jsonl`); add `--send http://localhost:8000` to post to a running backend
 - First-time setup: `python -m venv .venv` and `.venv\Scripts\python -m pip install -r requirements.txt` in `backend/`; `npm install` in `frontend/`
 

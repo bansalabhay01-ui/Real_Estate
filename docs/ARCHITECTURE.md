@@ -38,7 +38,7 @@ flowchart LR
 | Part | Where | Job |
 |---|---|---|
 | Tracking script | `sdk/leadops.js` | Collects behaviour after consent and sends it in batches |
-| Demo site, dashboard, analytics | `frontend/` | What buyers and the sales team see |
+| Front page, demo site, dashboard, analytics | `frontend/` | What judges, buyers and the sales team see: the LeadOps front page at `/`, the property site at `/demo` |
 | API | `backend/app/api/` | One module for each group of routes |
 | Scoring engine | `backend/app/scoring/` | Decides each visitor's label and explains it |
 | Assistant and other AI | `backend/app/ai/` | Chat, buyer details, visitor type, lead briefs, follow-ups |

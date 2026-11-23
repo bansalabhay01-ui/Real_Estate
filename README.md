@@ -8,10 +8,9 @@ them arrive on a live dashboard, with the buyer details the assistant picked up.
 
 | | |
 |---|---|
-| **The demo property site**<br>![The demo site's home page](docs/screenshots/site.png) | **The assistant answers from the brochure**<br>![The assistant explaining a payment plan](docs/screenshots/assistant.png) |
-| **A hot lead, with the next step**<br>![A hot lead's brief on the dashboard](docs/screenshots/visitor.png) | **A real stealth bot, caught and explained**<br>![A stealth bot labelled Bot, with the reasons](docs/screenshots/bot.png) |
-
-![The analytics page: the funnel, visitors by label and traffic per day](docs/screenshots/analytics.png)
+| **The LeadOps front page**<br>![The LeadOps front page: every website visitor, sorted in seconds](docs/screenshots/front.png) | **The demo property site**<br>![The demo site's homes page](docs/screenshots/site.png) |
+| **The assistant answers from the brochure**<br>![The assistant explaining a payment plan](docs/screenshots/assistant.png) | **A hot lead, with the next step**<br>![A hot lead's brief on the dashboard](docs/screenshots/visitor.png) |
+| **A real stealth bot, caught and explained**<br>![A stealth bot labelled Bot, with the reasons](docs/screenshots/bot.png) | **The analytics page**<br>![The analytics page: the funnel, visitors by label and traffic per day](docs/screenshots/analytics.png) |
 
 ## Results
 
@@ -27,7 +26,7 @@ Measured by `ml/evaluate.py`. The details are in [docs/RESULTS.md](docs/RESULTS.
 
 | Folder | What it holds | Owner |
 |---|---|---|
-| `frontend/` | React demo site (`/`, `/property/:id`) and the sales dashboard (`/dashboard`) | A |
+| `frontend/` | React: the LeadOps front page (`/`), the demo property site (`/demo`, `/property/:id`) and the sales dashboard (`/dashboard`) | A |
 | `sdk/` | `leadops.js`, the tracking script, and `demo.html`, a plain page that uses it | A |
 | `backend/app/` | FastAPI: events, listings, enquiries, chat, feedback, dashboard WebSocket | B |
 | `backend/app/ai/` | LLM wrapper, the LangGraph assistant, buyer-detail extraction, listing and brochure search | C |
@@ -74,11 +73,12 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173 for the demo site and http://localhost:5173/dashboard for the sales dashboard.
+Open http://localhost:5173 for the LeadOps front page, http://localhost:5173/demo for the demo property site and
+http://localhost:5173/dashboard for the sales dashboard.
 
 ## Try it
 
-1. Open the dashboard in one window and the demo site in another, then browse. You appear on the dashboard within
+1. Open the dashboard in one window and the demo property site (http://localhost:5173/demo) in another, then browse. You appear on the dashboard within
    seconds with a label and an intent score that climb as you use the EMI calculator, the floor plan and the
    assistant. Click your row for "Why this label" (the reasons, the human check's SHAP factors and the intent
    points), then your pages, scrolls and clicks in order. The buttons above the table filter by label.
@@ -243,7 +243,7 @@ LeadOps.onNudge(function (offer) {
 
 ## Privacy (DPDP Act 2023)
 
-- **Consent first.** The demo site asks before tracking anyone. Until the visitor presses Accept, nothing is sent and
+- **Consent first.** The demo site asks before tracking anyone, and the LeadOps front page at `/` is never tracked. Until the visitor presses Accept, nothing is sent and
   nothing is stored in their browser; Decline stops tracking and the site keeps working. Any website can do the same
   by adding `data-consent="required"` to the script tag and calling `LeadOps.consent(true)` or `LeadOps.consent(false)`.
 - **Masked for the LLM.** Phone numbers and emails are hidden before text reaches an LLM, and names are never sent.

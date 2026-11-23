@@ -460,7 +460,7 @@ Week 3 finished on 19 Nov. On 18 Nov the user asked for the whole project to be 
 
 ---
 
-## masal.ai-style Redesign Plan (approved 23 Nov)
+## masal.ai-style Redesign Plan (approved and built 23 Nov)
 The user said go on 23 Nov with the recommended choices:
 - LeadOps' own colours in masal.ai's style;
 - the front page at `/`, with the property site at `/demo`;
