@@ -457,3 +457,138 @@ Week 3 finished on 19 Nov. On 18 Nov the user asked for the whole project to be 
 - **Accounts and the deploy:** Render, Vercel and Neon, following `docs/DEPLOY.md`.
 - **One check with a real LLM key:** every LLM path has only run against fakes so far.
 - **The 3-minute demo video and at least five rehearsals.**
+
+---
+
+## masal.ai-style Redesign Plan (approved 23 Nov)
+The user said go on 23 Nov with the recommended choices:
+- LeadOps' own colours in masal.ai's style;
+- the front page at `/`, with the property site at `/demo`;
+- the business model in words, with no prices;
+- the pitch deck's screenshots refreshed after Part 4.
+
+**Goal:** you asked for the website in the style of https://masal.ai, plus a new front page modelled on masal.ai's. masal.ai sells an AI calling agent to real estate sales teams. Its page is built to win trust and a demo booking:
+- a dark hero with one big promise and two clear buttons;
+- proof straight away (customer logos, a real result, real call recordings);
+- the product shown as animated screens, a 4-step "how it works", pricing and an FAQ;
+- one action repeated everywhere.
+
+The look:
+- near-black and dark-wine sections that alternate with white and bone ones and have rounded top corners;
+- the Geist font, with Geist Mono for small labels;
+- huge two-line headlines with one word highlighted;
+- pill-shaped buttons and menu;
+- a logo strip that scrolls by itself, a paragraph that lights up as you scroll, and a closing funnel graphic.
+
+**What we take, and what we don't:** we copy the structure, rhythm, typography and motion. We don't copy their words, logos, client logos, photos, recordings or prices. LeadOps has no customers yet, so there are no customer logos, testimonials or made-up figures: only real LeadOps numbers, each with an honest label (for example "15/15 real bots caught", "simulated traffic").
+
+**What "done" looks like:**
+1. The main link opens the new LeadOps front page. **Try the live demo** opens the property site, and **Open the dashboard** opens the dashboard.
+2. The property site, its homes, the assistant, the forms, the consent banner and the privacy page all look like one product with the front page, and work exactly as before.
+3. The dashboard and the analytics page have the new look. Every feature still works.
+4. Bots, tester links, Simulate traffic and the backend tests behave exactly as before.
+5. Everything works at phone width. With "reduce motion" switched on in the browser, nothing animates.
+
+Five parts. Each ends with the build passing and a check, then I save and push it. The owner is in brackets.
+
+### Addresses after the change
+| Address | Page |
+|---|---|
+| `/` | the new LeadOps front page |
+| `/demo` | the property site's homes page (today at `/`) |
+| `/property/:id`, `/privacy` | unchanged (scoring reads the `/property/` path) |
+| `/dashboard`, `/dashboard/analytics` | unchanged addresses, new look |
+
+- Old tester links (`/?lo_test=...`) forward to `/demo?lo_test=...`, so links already shared keep working.
+- The front page is never tracked. The SDK (1.4) learns one small option: an entry in `data-exclude-paths` ending in `$` matches only that exact path (`/dashboard,/$`).
+
+### Part 1: Design system (A)
+- **Fonts:** Geist and Geist Mono (Google Fonts) replace Archivo. Noto Sans Devanagari stays, for Hindi and Marathi.
+- **Colours:** set once, as tokens in `frontend/src/index.css` (Decision 1). Changing the palette later is a few lines.
+- **Shared pieces:**
+  - pill buttons (main, light and outline, with an ↗ arrow) and mono "eyebrow" labels;
+  - dark and light section shells with rounded top corners;
+  - cards, chips, and the dark hero background (a soft glow over a fine grid);
+  - scroll reveal, with a no-motion fallback.
+
+### Part 2: The LeadOps front page (A, with C for the words)
+Each masal.ai section, rebuilt for LeadOps:
+| masal.ai | LeadOps version |
+|---|---|
+| Pill menu, "Book a demo" | Pill menu (How it works, Live demo, Dashboard, Privacy, FAQ); **Try the live demo ↗** |
+| Hero: "Your whole database, called this week." with a sound-wave pill; stats strip | A two-line headline built on your tagline, with an inline pill that flips between `Bot`, `Junk` and `Hot`. Below it the buttons, and a mono strip of real facts: 1 script tag, 3 checks, 4 languages, 15/15 real bots caught |
+| Scrolling client logos | A scrolling strip of the signals LeadOps reads (mouse movement, scroll depth, hidden honeypot, automation flags, EMI calculator, floor plans, fake numbers, broker messages...) |
+| "About" paragraph that lights up as you scroll | The problem in one paragraph: fake enquiries waste sales time, while real buyers leave without a trace |
+| "5,000 calls → 263 buyers" | Real results: 15/15 real bots caught; 1,000 simulated visitors sorted with every fake filtered and no buyer lost (marked as simulated) |
+| Dark "Listen to Riya on real calls" | Dark **"Watch LeadOps sort an attack"**: an animated feed of visitors getting labels. Three example visitors (stealth bot → `Bot`, rival broker → `Junk`, serious buyer → `Hot`) open to show their reasons. A row of 4 facts, and capability chips |
+| Light "Set up in four steps", with a changing app window | **How it works, in four steps:** add one script tag → visitors browse and chat → every visitor scored → sales gets the ready ones. A small app window changes with each step |
+| Dark "Lead Centre" and pipeline | Dark **"Every lead lands on your dashboard"**: an animated dashboard preview (labels, intent, reasons) and the funnel visitor → human → contact → Hot |
+| Ads and WhatsApp add-ons | Feature cards: the assistant in 4 languages, smart offers for silent buyers, the lead brief, privacy (DPDP). A phone showing a WhatsApp follow-up in Hinglish |
+| Pricing | Business model (Decision 3) |
+| FAQ | FAQ with real answers: speed, accuracy (as measured), what is stored, DPDP, languages, no LLM key, can a bot fool it |
+| Funnel stripes and "Find the buyers in your database." | A funnel of visitors narrowing to hot leads, a big closing line, **Try the live demo** and **Open the dashboard** |
+| Footer with a giant faded wordmark | The same idea with LEADOPS. Links to the demo, dashboard, analytics, privacy and GitHub, and a team line. No made-up address or phone number |
+
+The animated screens are built in HTML and CSS (no pictures) with the demo's fictional homes and names, labelled as illustrations. The front page loads on its own, and the dashboard code loads only when the dashboard opens.
+
+### Part 3: The property site in the new style (A, B)
+- **Homes page (`/demo`):** a dark hero band with the new headline style, pill filters, and cards whose floor-plan drawings use the new colours.
+- **Same features, new look:**
+  - the property page, enquiry form, phone check and EMI calculator;
+  - the assistant and offer card;
+  - the consent banner and the privacy page.
+- **Bots and links:**
+  - `ml/bots/run_bots.py` opens `/demo?lo_test=...`;
+  - the README tester-link table and the classmates' link are updated;
+  - the simulator's home path becomes `/demo`. This doesn't change the model: paths aren't model features.
+
+### Part 4: Dashboard and analytics in the new style (A)
+- **Header:** dark, with a pill menu.
+- **Working area:** stays light (white and bone), because tables of names and numbers read better that way, especially on a projector.
+- **New styling:** mono labels, pill filters, and new label badges, cards and tables. The passcode screen and the Simulate traffic panel get it too, and the charts get the new colours.
+- **No changes to what anything does.**
+
+### Part 5: Documents and checks (everyone)
+- README (links, tester links, new screenshots in `docs/screenshots/`), `docs/DEMO_SCRIPT.md` (the demo now opens on the front page), the `docs/DEPLOY.md` checklist, and the routes in `docs/ARCHITECTURE.md`.
+- Do the redesign before recording the demo video, so the video shows the final look.
+
+### New files
+| File | What it's for |
+|---|---|
+| `frontend/src/components/ui.jsx` | shared pieces: buttons, eyebrow labels, section shells, chips, scroll reveal |
+| `frontend/src/pages/Landing.jsx` | the front page, putting the sections together |
+| `frontend/src/landing/Hero.jsx` | menu, hero, facts strip, signals strip, problem paragraph, results |
+| `frontend/src/landing/LiveSort.jsx` | "Watch LeadOps sort an attack": the animated feed and the three example visitors |
+| `frontend/src/landing/HowItWorks.jsx` | the four steps and their app window |
+| `frontend/src/landing/DashboardPreview.jsx` | the animated dashboard preview and the funnel |
+| `frontend/src/landing/Features.jsx` | feature cards and the WhatsApp phone |
+| `frontend/src/landing/Closing.jsx` | business model, FAQ, closing call to action and footer |
+
+### New packages
+None. The animations use CSS and small React hooks, not an animation library.
+
+### Contracts
+No changes to the API, events or WebSocket messages. The SDK gains one optional, backwards-compatible way to exclude an exact path (above).
+
+### Decisions for you
+1. **Colours:**
+   - **LeadOps' own colours in masal.ai's style (recommended):** dark navy-ink sections, blueprint blue and a marigold highlight, white and bone light sections. It keeps the blueprint floor plans as the signature, matches the pitch deck and screenshots, and doesn't look copied from masal.ai, which sells to the same real estate market.
+   - **masal.ai's palette:** near-black, dark wine, maroon and rose.
+2. **Front page address:**
+   - **`/`, with the property site moving to `/demo` (recommended):** judges open one link and meet LeadOps first.
+   - **`/leadops`:** nothing else moves, but the main link still opens the property site.
+3. **Pricing:**
+   - **The business model in words, no prices (recommended):** for example "pay per qualified lead" or a monthly plan, without numbers we can't back up.
+   - **Proposed plan cards like masal.ai's:** with prices the team chooses.
+4. **Pitch deck:** `docs/LeadOps_pitch.pptx` shows the old look.
+   - **Refresh its screenshots after Part 4 (recommended).**
+   - **Leave it as it is.**
+
+### Verification (after each part)
+- `npm run build` passes, and the backend tests still pass.
+- A headless Edge check at 1440 px and 390 px:
+  - no sideways scroll and no console errors;
+  - every front-page link and button works, and the FAQ opens with the keyboard;
+  - with reduced motion on, nothing animates.
+- Part 3: a real stealth bot run through `/demo` is still labelled `Bot`. An old `/?lo_test=genuine` link lands on `/demo` and still marks the visit as a test session.
+- Parts 3 and 4: the buyer flow and the dashboard flow from the Week 3 checks work as before: assistant, offer, enquiry and OTP, Simulate traffic, the lead brief, verdicts, analytics.

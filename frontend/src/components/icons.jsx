@@ -117,6 +117,24 @@ export const IconTest = (props) => (
   </Icon>
 );
 
+export const IconArrowUpRight = (props) => (
+  <Icon {...props}>
+    <path d="M7 17 17 7M8 7h9v9" />
+  </Icon>
+);
+
+export const IconPlus = (props) => (
+  <Icon {...props}>
+    <path d="M12 5v14M5 12h14" />
+  </Icon>
+);
+
+export const IconMinus = (props) => (
+  <Icon {...props}>
+    <path d="M5 12h14" />
+  </Icon>
+);
+
 // The brand mark: a plan square with two inner walls.
 export const PlanMark = ({ className = "size-7" }) => (
   <svg viewBox="0 0 32 32" className={className} aria-hidden="true">

@@ -1,31 +1,75 @@
 @import "tailwindcss";
 
-/* LeadOps Realty tokens. The one bold element is the blueprint floor plan; everything else stays quiet. */
+/* LeadOps tokens. The look follows masal.ai's rhythm (dark and light sections, big quiet type, pill controls), drawn in
+   LeadOps' own world: blueprint blue on night-navy drafting paper, with marigold as the single highlight. */
 @theme {
-  --font-sans: "Archivo", "Noto Sans Devanagari", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Geist", "Noto Sans Devanagari", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  --color-ink: #17212b; /* drafting ink: text */
-  --color-ink-soft: #3b4652;
+  /* Dark surfaces */
+  --color-night: #07101c; /* the hero, the dashboard header and the footer */
+  --color-night-2: #0e1a2b; /* panels raised on night */
+  --color-deep: #0b2140; /* cyanotype sections */
+  --color-deep-2: #12335f; /* panels raised on deep */
+  --color-sky: #8fc0ff; /* links, icons and focus on dark surfaces */
+
+  /* Light surfaces and text */
+  --color-paper: #ffffff;
+  --color-concrete: #f2f4f7; /* the second light surface */
+  --color-ink: #0e1826; /* text */
+  --color-ink-soft: #364250;
   --color-muted: #5b6773; /* secondary text, 5:1 on concrete */
-  --color-concrete: #f3f5f6; /* page background */
-  --color-line: #d9dee3; /* borders */
-  --color-blueprint: #1d4f91; /* floor plans, links, focus */
+  --color-line: #dde2e8; /* borders */
+
+  /* Brand */
+  --color-blueprint: #1d4f91; /* floor plans, links, focus, main buttons on light */
   --color-blueprint-deep: #163d70;
   --color-blueprint-line: #e6effa;
-  --color-marigold: #f2a20c; /* main actions (ink text on it); too light for marks on white */
+  --color-marigold: #f2a20c; /* the highlight: hero words and main buttons on dark (ink text on it) */
+  --color-marigold-deep: #e09500;
+
+  /* Meaning */
   --color-amber: #9c5a00; /* enquiry markers and "possession" badges */
   --color-alert: #b4232a; /* bot signals */
   --color-ok: #1e7a4c; /* ready to move */
+
+  --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@utility font-wide {
-  font-stretch: 112%;
-}
-@utility font-extra-wide {
-  font-stretch: 125%;
-}
 @utility tabular {
   font-variant-numeric: tabular-nums;
+}
+
+/* The type scale: one family, weight 500 for headlines, tight tracking that grows with size. */
+@utility text-display {
+  font-size: clamp(2.9rem, 7.2vw, 6.4rem);
+  line-height: 0.98;
+  letter-spacing: -0.045em;
+  font-weight: 500;
+}
+@utility text-section {
+  font-size: clamp(2.3rem, 4.6vw, 4.1rem);
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+  font-weight: 500;
+}
+@utility text-title {
+  font-size: clamp(1.4rem, 2vw, 1.75rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-weight: 500;
+}
+@utility text-lede {
+  font-size: clamp(1.05rem, 1.4vw, 1.2rem);
+  line-height: 1.6;
+}
+
+/* Until the property site and the dashboard are restyled, their old width classes keep a display feel. */
+@utility font-wide {
+  letter-spacing: -0.015em;
+}
+@utility font-extra-wide {
+  letter-spacing: -0.03em;
 }
 
 @layer base {
@@ -37,6 +81,7 @@
     font-family: var(--font-sans);
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   h1,
   h2,
@@ -48,9 +93,130 @@
     outline: 2px solid var(--color-blueprint);
     outline-offset: 2px;
   }
+  /* On dark surfaces blueprint blue disappears, so focus turns sky blue. */
+  [data-tone="dark"] :focus-visible {
+    outline-color: var(--color-sky);
+  }
 }
 
-/* The hero floor plan draws itself once: walls first, then the room names. */
+/* A dimension line, as on a drawing: a hairline with a tick at each end. */
+.dim-rule {
+  position: relative;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.16;
+}
+.dim-rule::before,
+.dim-rule::after {
+  content: "";
+  position: absolute;
+  top: -4px;
+  width: 1px;
+  height: 9px;
+  background: currentColor;
+}
+.dim-rule::before {
+  left: 0;
+}
+.dim-rule::after {
+  right: 0;
+}
+
+/* Night drafting paper: a fine grid that fades out, under a blueprint glow. */
+.drafting-grid {
+  background-image:
+    linear-gradient(to right, rgb(143 192 255 / 0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(143 192 255 / 0.07) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: radial-gradient(ellipse 70% 65% at 40% 45%, #000 30%, transparent 80%);
+}
+.hero-glow {
+  background:
+    radial-gradient(ellipse 55% 60% at 22% 38%, rgb(29 79 145 / 0.55), transparent 70%),
+    radial-gradient(ellipse 40% 45% at 82% 30%, rgb(18 51 95 / 0.7), transparent 72%),
+    var(--color-night);
+}
+/* The band under the hero: ruled lines lit from the middle, like a plan table under a lamp. */
+.glow-band {
+  background:
+    radial-gradient(ellipse 50% 100% at 50% 0%, rgb(29 79 145 / 0.55), transparent 75%),
+    repeating-linear-gradient(to bottom, rgb(143 192 255 / 0.16) 0 1px, transparent 1px 13px);
+  mask-image: linear-gradient(to bottom, #000, transparent);
+}
+
+/* Strips that scroll on their own. Two copies of the content sit side by side; moving by half loops seamlessly. */
+@keyframes marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+.marquee-track {
+  animation: marquee var(--marquee-duration, 48s) linear infinite;
+}
+.marquee-track[data-reverse="true"] {
+  animation-direction: reverse;
+}
+.marquee:hover .marquee-track {
+  animation-play-state: paused;
+}
+
+/* The hero's label pill: a scan line sweeps across while the label flips. */
+@keyframes scan {
+  from {
+    transform: translateX(-120%);
+  }
+  to {
+    transform: translateX(320%);
+  }
+}
+.scan-line {
+  animation: scan 1.8s var(--ease-out-soft) infinite;
+}
+@keyframes label-in {
+  from {
+    opacity: 0;
+    transform: translateY(45%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.label-in {
+  animation: label-in 0.45s var(--ease-out-soft) both;
+}
+
+/* A new row arriving in a live feed. */
+@keyframes row-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.row-in {
+  animation: row-in 0.5s var(--ease-out-soft) both;
+}
+
+/* The hero headline rises in once, line by line: the page's one orchestrated moment. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.35em);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.rise {
+  animation: rise 0.9s var(--ease-out-soft) both;
+}
+
+/* The floor plan draws itself once: walls first, then the room names. */
 @keyframes plan-draw {
   to {
     stroke-dashoffset: 0;
@@ -87,9 +253,18 @@
 @media (prefers-reduced-motion: reduce) {
   .plan-animate .plan-wall,
   .plan-animate .plan-label,
-  .row-flash {
+  .row-flash,
+  .scan-line,
+  .label-in,
+  .row-in,
+  .rise,
+  .marquee-track {
     animation: none;
     stroke-dashoffset: 0;
     opacity: 1;
+    transform: none;
+  }
+  .scan-line {
+    display: none;
   }
 }

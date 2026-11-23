@@ -6,7 +6,8 @@
  * Script tag options:
  *   data-api            API base URL (default: the address the script was loaded from)
  *   data-site           a name for this website (default: the page's hostname)
- *   data-exclude-paths  comma-separated path prefixes to skip, e.g. "/dashboard,/admin"
+ *   data-exclude-paths  comma-separated path prefixes to skip, e.g. "/dashboard,/admin"; end one with $ to skip
+ *                       only that exact path, e.g. "/$" for a front page that isn't part of the tracked site
  *   data-consent        "required": send and store nothing until the site calls LeadOps.consent(true)
  *
  * In page code:
@@ -27,7 +28,7 @@
   "use strict";
   if (window.LeadOps && window.LeadOps.version) return; // already loaded on this page
 
-  var VERSION = "1.3.1";
+  var VERSION = "1.4.0";
   var SESSION_TIMEOUT_MS = 30 * 60 * 1000; // a new visit starts after 30 minutes without activity
   var FLUSH_INTERVAL_MS = 5000;
   var ACTIVITY_INTERVAL_MS = 10000;
@@ -53,7 +54,9 @@
     .filter(Boolean);
 
   function isExcluded(path) {
-    return excludedPaths.some(function (prefix) { return path.indexOf(prefix) === 0; });
+    return excludedPaths.some(function (rule) {
+      return rule.charAt(rule.length - 1) === "$" ? path === rule.slice(0, -1) : path.indexOf(rule) === 0;
+    });
   }
 
   // ---------------------------------------------------------------- storage (falls back to memory when blocked)
@@ -352,7 +355,7 @@
         touches: activity.touches,
         keys: activity.keys, // how many keys were pressed, never which ones
         scrolls: activity.scrolls
-      });
+      }, page ? page.path : undefined); // filed under the page it happened on, even mid-navigation
     }
     resetActivity();
   }

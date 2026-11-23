@@ -9,7 +9,8 @@ export function loadTracker() {
   script.async = true;
   script.dataset.api = API_URL;
   script.dataset.site = "leadops-realty-demo";
-  script.dataset.excludePaths = "/dashboard"; // the sales team using the dashboard aren't visitors
+  // The sales team using the dashboard aren't visitors, and the LeadOps front page ("/" exactly) isn't the property site.
+  script.dataset.excludePaths = "/dashboard,/$";
   script.dataset.consent = "required"; // nothing is sent until the visitor accepts the banner
   document.head.appendChild(script);
 }
