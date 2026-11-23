@@ -9,6 +9,32 @@ its own account. Allow about 30 minutes. Do the steps in this order, because eac
 | Backend | Render | the API address, such as `https://leadops-api.onrender.com` |
 | Site and dashboard | Vercel | the public address to share |
 
+## The live deployment
+
+LeadOps has been live since 23 Nov 2026. Claude set it up with the three services' command-line tools, using the same
+settings as the steps below.
+
+| Part | Where | Address |
+|---|---|---|
+| Site and dashboard | Vercel project `leadops` | https://leadops-henna.vercel.app |
+| Backend | Render web service `leadops-api` (Singapore, free plan) | https://leadops-api-pudl.onrender.com |
+| Database | Neon project `leadops` (Singapore, Postgres 18) | its connection string is kept only in Render's settings |
+
+- The dashboard passcode is in Render: open `leadops-api`, then **Environment**, then `DASHBOARD_PASSCODE`.
+- No LLM key is set, so the assistant answers from templates and nothing is billed. To use a real LLM, add one key in
+  the same **Environment** tab (see "The LLM" in the README) and save; Render then redeploys the backend with it.
+
+### Putting a change live
+
+Neither service deploys by itself when `main` changes, because neither is connected to GitHub. After pushing:
+
+- **Backend:** in Render, open `leadops-api` and choose **Manual Deploy**, then **Deploy latest commit**. With the
+  [Render CLI](https://render.com/docs/cli): `render deploys create <service ID> --wait` (`render services` shows the ID).
+- **Site:** from `frontend/`, run `npx vercel login` and `npx vercel link --yes --project leadops` once on your computer,
+  then `npx vercel deploy --prod` for each release.
+- To deploy on every push instead, connect the GitHub repository in each service's settings (for Vercel,
+  `npx vercel git connect`).
+
 ## 1. The database (Neon)
 
 1. Sign up at https://neon.tech and create a project. Pick **Singapore** as the region, the closest to India.
@@ -64,5 +90,7 @@ bot, run the backend and the site on the presenter's laptop.
 - **Memory:** the backend used about 270 MB during a 250-visitor simulated run on Postgres, inside the free plan's 512 MB.
 - **One server process only:** live dashboard updates are kept in memory, so don't add workers or a second instance.
 - **Tests on Postgres:** to run the backend tests against Postgres, set `TEST_DATABASE_URL` to an empty database.
+- **Render CLI in Git Bash on Windows:** set `MSYS_NO_PATHCONV=1` first. Otherwise Git Bash turns an argument such as
+  `/health` into `C:/Program Files/Git/health`, and Render never marks the deploy live.
 - **Limit who can call the API:** `CORS_ORIGINS` is `*` because the tracking script is meant to run on any website. Dashboard
   routes are protected by the passcode either way.

@@ -4,6 +4,18 @@ LeadOps finds the genuine buyers among a real estate website's visitors. One scr
 every visitor is scored live (Bot, Junk, Review, Cold, Warm or Hot, with the reasons), and the sales team watches
 them arrive on a live dashboard, with the buyer details the assistant picked up.
 
+## Live demo
+
+| Page | Address |
+|---|---|
+| The LeadOps front page | https://leadops-henna.vercel.app |
+| The demo property site | https://leadops-henna.vercel.app/demo |
+| The sales dashboard (ask the team for the passcode) | https://leadops-henna.vercel.app/dashboard |
+| The backend's status | https://leadops-api-pudl.onrender.com/health |
+
+The backend runs on Render's free plan, which sleeps after about 15 minutes without visitors, so the first page after
+a quiet spell can take up to a minute. How it is hosted, and how to put a change live, is in [docs/DEPLOY.md](docs/DEPLOY.md).
+
 ![The sales dashboard after 250 simulated visitors arrived](docs/screenshots/dashboard.png)
 
 | | |
