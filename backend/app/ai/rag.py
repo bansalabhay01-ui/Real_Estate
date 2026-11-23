@@ -1,7 +1,7 @@
 """Find listings for a chat message: structured filters first, then keyword overlap to rank.
 
 For questions like "3BHK under 90L in Pune" this is more accurate than vector search and needs no extra
-install. Member C adds ChromaDB over the brochures (PDFs) in Week 2.
+install. Brochure questions are answered by brochures.py.
 """
 
 import re

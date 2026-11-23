@@ -72,7 +72,8 @@ function FollowUp({ visitorId }) {
   }
 
   const whatsapp = draft?.whatsapp_number ? `https://wa.me/${draft.whatsapp_number}?text=${encodeURIComponent(text)}` : null;
-  const email = draft?.email ? `mailto:${draft.email}?subject=${encodeURIComponent(draft.subject)}&body=${encodeURIComponent(text)}` : null;
+  // The address is encoded too, so an enquiry's "email" like "a@b.in?bcc=x@y.in" can't add recipients.
+  const email = draft?.email ? `mailto:${encodeURIComponent(draft.email).replace(/%40/g, "@")}?subject=${encodeURIComponent(draft.subject)}&body=${encodeURIComponent(text)}` : null;
   return (
     <div className="mt-2 flex flex-col gap-2 rounded-md border border-line p-3">
       <div className="flex flex-wrap items-center gap-2">

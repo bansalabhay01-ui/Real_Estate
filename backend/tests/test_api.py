@@ -117,6 +117,23 @@ def test_lead_keeps_honeypot_timing_and_ip(client):
     assert client.get(f"/visitors/{visitor_id}").json()["visitor"]["lead_count"] == 1
 
 
+def test_cloudflares_client_ip_beats_a_made_up_forwarded_for(client):
+    response = client.post(
+        "/leads",
+        json={"name": "Asha", "phone": "9822012345", "consent": True},
+        headers={"X-Forwarded-For": "198.51.100.66", "CF-Connecting-IP": "203.0.113.9"},
+    )
+    assert client.get(f"/leads/{response.json()['lead_id']}").json()["ip"] == "203.0.113.9"
+
+
+def test_a_flood_of_chat_messages_is_turned_away(client):
+    flood = {"CF-Connecting-IP": "203.0.113.50"}
+    for _ in range(30):
+        assert client.post("/chat", json={"message": "3BHK in Pune"}, headers=flood).status_code == 200
+    assert client.post("/chat", json={"message": "3BHK in Pune"}, headers=flood).status_code == 429
+    assert client.post("/chat", json={"message": "3BHK in Pune"}, headers={"CF-Connecting-IP": "203.0.113.51"}).status_code == 200
+
+
 def test_lead_without_the_sdk_gets_its_own_visitor(client):
     response = client.post("/leads", json={"name": "Bot", "phone": "9999999999"})
     lead = client.get(f"/leads/{response.json()['lead_id']}").json()

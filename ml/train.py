@@ -20,7 +20,6 @@ Needs backend/requirements.txt and ml/requirements.txt in the backend's virtual 
 import argparse
 import hashlib
 import json
-import math
 import random
 import sys
 from collections import Counter
@@ -281,7 +280,7 @@ def main() -> int:
     print(f"Cut-offs: Bot below {thresholds['bot']}, Review below {thresholds['review']}")
 
     model_text = booster.model_to_string(num_iteration=booster.best_iteration)
-    version = f"lgbm-{datetime.now(UTC):%Y%m%d}-{hashlib.sha1(model_text.encode()).hexdigest()[:6]}"
+    version = f"lgbm-{datetime.now(UTC):%Y%m%d}-{hashlib.sha1(model_text.encode(), usedforsecurity=False).hexdigest()[:6]}"
     contributions = booster.predict(np.array(x_test, dtype=float), pred_contrib=True, num_iteration=booster.best_iteration)
     importance = dict(sorted(zip(features, np.abs(contributions[:, :-1]).mean(axis=0).round(4).tolist()), key=lambda kv: -kv[1]))
     info = {"version": version, "thresholds": thresholds, "features": features}

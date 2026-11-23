@@ -127,7 +127,8 @@ def classify_visitor(visitor_id: str, *, use_llm: bool = True) -> ScoreUpdate | 
         ))  # fmt: skip
         profile = dict(visitor.profile or {})
         saved = visitor.visitor_type or {}
-    digest = hashlib.sha1(json.dumps([texts, profile.get("purpose")], ensure_ascii=False).encode()).hexdigest()[:16]
+    text = json.dumps([texts, profile.get("purpose")], ensure_ascii=False)
+    digest = hashlib.sha1(text.encode(), usedforsecurity=False).hexdigest()[:16]  # spots unchanged messages, nothing more
     if saved.get("text_hash") == digest:
         return None
     result = classify(texts, profile, use_llm=use_llm)  # may call the LLM: no database session is open

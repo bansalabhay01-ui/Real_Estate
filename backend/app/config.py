@@ -45,6 +45,7 @@ class Settings:
     anthropic_api_key: str
     gemini_api_key: str
     groq_api_key: str
+    llm_daily_limit: int  # LLM calls allowed in any 24 hours, so a flood of chat messages can't run up the bill; 0: no limit
     dashboard_passcode: str  # empty: the dashboard is open (local development)
     retention_days: int  # personal data older than this is removed; 0 keeps it
 
@@ -64,6 +65,7 @@ settings = Settings(
     anthropic_api_key=_env("ANTHROPIC_API_KEY"),
     gemini_api_key=_env("GEMINI_API_KEY"),
     groq_api_key=_env("GROQ_API_KEY"),
+    llm_daily_limit=_whole_number("LLM_DAILY_LIMIT", 1000),
     dashboard_passcode=_env("DASHBOARD_PASSCODE"),
     retention_days=_whole_number("RETENTION_DAYS", 180),
 )

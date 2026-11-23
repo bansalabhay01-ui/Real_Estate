@@ -1,4 +1,4 @@
-export const CITIES = ["Pune", "Bengaluru", "Hyderabad", "Mumbai", "Noida"];
+const CITIES =["Pune", "Bengaluru", "Hyderabad", "Mumbai", "Noida"];
 const BEDROOMS = [1, 2, 3, 4];
 const BUDGETS = [
   [7_500_000, "Under ₹75 L"],

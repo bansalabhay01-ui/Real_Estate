@@ -1,6 +1,9 @@
 """Small helpers shared across the backend."""
 
 import re
+import threading
+import time
+from collections import deque
 from datetime import UTC, date, datetime, timedelta, timezone
 from typing import Any
 
@@ -33,16 +36,51 @@ def iso(value: datetime | None) -> str | None:
 
 
 def client_ip(conn: HTTPConnection) -> str | None:
-    """The visitor's IP address. Behind a proxy (Render, Vercel) the first X-Forwarded-For entry is the client."""
+    """The visitor's IP address.
+
+    On Render, Cloudflare sits in front and sets CF-Connecting-IP / True-Client-IP, which a browser can't fake.
+    X-Forwarded-For comes next: Render adds to it without clearing what the browser sent, so its first entry can be
+    made up, but it is all there is locally (and the simulator sets it on purpose)."""
+    for header in ("cf-connecting-ip", "true-client-ip"):
+        value = (conn.headers.get(header) or "").strip()
+        if value:
+            return value[:64]
     forwarded = conn.headers.get("x-forwarded-for")
     if forwarded:
         first = forwarded.split(",")[0].strip()
         if first:
             return first[:64]
-    real_ip = conn.headers.get("x-real-ip")
-    if real_ip:
-        return real_ip.strip()[:64]
     return conn.client.host if conn.client else None
+
+
+class RateLimit:
+    """At most `limit` hits per key in any `window_s` seconds. Kept in memory, so it assumes one server process
+    (as realtime.py does)."""
+
+    def __init__(self, limit: int, window_s: float) -> None:
+        self.limit, self.window_s = limit, window_s
+        self._hits: dict[str, deque[float]] = {}
+        self._lock = threading.Lock()
+
+    def allow(self, key: str) -> bool:
+        """Count a hit for this key, unless it is over the limit. A limit of 0 means no limit."""
+        if self.limit <= 0:
+            return True
+        now = time.monotonic()
+        with self._lock:
+            if len(self._hits) > 10_000:  # forget keys that have gone quiet, so memory stays small
+                self._hits = {key: hits for key, hits in self._hits.items() if hits and now - hits[-1] < self.window_s}
+            hits = self._hits.setdefault(key, deque())
+            while hits and now - hits[0] >= self.window_s:
+                hits.popleft()
+            if len(hits) >= self.limit:
+                return False
+            hits.append(now)
+            return True
+
+    def clear(self) -> None:
+        with self._lock:
+            self._hits.clear()
 
 
 _TABLET = re.compile(r"iPad|Tablet|Android(?!.*Mobile)", re.IGNORECASE)

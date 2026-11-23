@@ -27,7 +27,7 @@
   "use strict";
   if (window.LeadOps && window.LeadOps.version) return; // already loaded on this page
 
-  var VERSION = "1.3.0";
+  var VERSION = "1.3.1";
   var SESSION_TIMEOUT_MS = 30 * 60 * 1000; // a new visit starts after 30 minutes without activity
   var FLUSH_INTERVAL_MS = 5000;
   var ACTIVITY_INTERVAL_MS = 10000;
@@ -389,9 +389,17 @@
     if (text) props.text = text;
     if (target.id) props.id = target.id.slice(0, 60);
     var href = target.getAttribute("href");
-    if (href) props.href = href.slice(0, 200);
+    if (href) props.href = safeHref(href);
     push("click", props);
   }, true);
+
+  // Where a link goes, without its query string or #fragment (they can hold personal details, as page URLs can),
+  // and only the scheme of mailto:, tel: and sms: links, whose address is someone's email or number.
+  function safeHref(href) {
+    var scheme = /^\s*(mailto|tel|sms):/i.exec(href);
+    if (scheme) return scheme[1].toLowerCase() + ":";
+    return href.split(/[?#]/)[0].slice(0, 200);
+  }
 
   // ---------------------------------------------------------------- public API
 

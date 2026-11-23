@@ -237,7 +237,8 @@ def _brief_key(visitor: Visitor, visit: str | None) -> str:
     score = visitor.score or {}
     consistency = (score.get("detail") or {}).get("consistency")
     parts = [visitor.label, visitor.intent_score, score.get("reasons"), visitor.profile, visitor.feedback_label, visit, visitor.lead_count, consistency]
-    return hashlib.sha1(json.dumps(parts, ensure_ascii=False, sort_keys=True, default=str).encode()).hexdigest()[:16]
+    text = json.dumps(parts, ensure_ascii=False, sort_keys=True, default=str)
+    return hashlib.sha1(text.encode(), usedforsecurity=False).hexdigest()[:16]  # a cache key, not a security check
 
 
 def _llm_lines(facts: dict) -> list[str]:
@@ -277,8 +278,9 @@ def build_brief(visitor_id: str) -> BriefOut | None:
             log.warning("LLM brief failed, using the template: %s", exc)
     if mode == "llm":
         with SessionLocal() as db:
-            db.get(Visitor, visitor_id).brief = {"key": key, "lines": lines}
-            db.commit()
+            if row := db.get(Visitor, visitor_id):  # it may have been erased during the LLM call
+                row.brief = {"key": key, "lines": lines}
+                db.commit()
     return BriefOut(lines=lines, next_step=step, mode=mode)
 
 
@@ -365,5 +367,6 @@ def build_followup(visitor_id: str, channel: str, language: str) -> FollowUpOut 
     return FollowUpOut(
         channel=channel, language=language, subject=subject, text=text, mode=mode, whatsapp_number=number,
         whatsapp_url=f"https://wa.me/{number}?text={quote(text)}" if number else None, email=email,
-        mailto_url=f"mailto:{email}?subject={quote(subject)}&body={quote(text)}" if email else None,
+        # quote() the address too: an enquiry's "email" like "a@b.in?bcc=x@y.in" must not add recipients to the link.
+        mailto_url=f"mailto:{quote(email, safe='@')}?subject={quote(subject)}&body={quote(text)}" if email else None,
     )  # fmt: skip

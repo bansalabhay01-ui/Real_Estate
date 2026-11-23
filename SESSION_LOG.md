@@ -3,13 +3,40 @@
 A short diary of LeadOps work sessions, newest first. Claude saves each session by itself: whenever a piece of work is finished, and at the start of the next session if the last one wasn't saved. Each save updates this file, commits, and pushes to GitHub.
 
 ## Current status
-_Last updated: 2026-11-19_
+_Last updated: 2026-11-23_
 
 - **Phase:** everything in `LEADOPS_PLAN.md` that can be built is built, Weeks 1 to 4. What's left needs the team: real test sessions, the deploy, one check with a real LLM key, the demo video and rehearsals. Deadline about 30 Nov 2026.
-- **Done:** the Week 1 foundation (demo property site, tracking SDK, FastAPI backend, a basic property assistant in English, Hinglish and Hindi, the live sales dashboard, the traffic simulator, the shared contracts draft), all of Week 2 ("Week 2 Build Plan" in `LEADOPS_PLAN.md`: tester links, simulator v2, features and rules, the LightGBM human check with SHAP, intent points, labels and reasons, dashboard v1, three real Playwright bots, LLM extraction and visitor type) and all of Week 3: the dashboard's Simulate traffic button with a live scoreboard and Run a real bot; the assistant as a LangGraph agent with brochure answers, EMIs, site visits and Marathi; the smart engagement trigger that turns serious anonymous visitors into leads; the lead brief with a next step, follow-up drafts in the buyer's language, one-click site visits and sales verdicts; the says-versus-does checks and retraining that learns from sales verdicts; consent before tracking, data retention and erasure, a mocked OTP and a dashboard passcode. All of Week 4: the analytics page, everything needed to deploy (`docs/DEPLOY.md`), the measured results (`docs/RESULTS.md`), the architecture and demo script, a README with screenshots, and the pitch deck (`docs/LeadOps_pitch.pptx`). 252 tests pass.
+- **Done:** the Week 1 foundation (demo property site, tracking SDK, FastAPI backend, a basic property assistant in English, Hinglish and Hindi, the live sales dashboard, the traffic simulator, the shared contracts draft), all of Week 2 ("Week 2 Build Plan" in `LEADOPS_PLAN.md`: tester links, simulator v2, features and rules, the LightGBM human check with SHAP, intent points, labels and reasons, dashboard v1, three real Playwright bots, LLM extraction and visitor type) and all of Week 3: the dashboard's Simulate traffic button with a live scoreboard and Run a real bot; the assistant as a LangGraph agent with brochure answers, EMIs, site visits and Marathi; the smart engagement trigger that turns serious anonymous visitors into leads; the lead brief with a next step, follow-up drafts in the buyer's language, one-click site visits and sales verdicts; the says-versus-does checks and retraining that learns from sales verdicts; consent before tracking, data retention and erasure, a mocked OTP and a dashboard passcode. All of Week 4: the analytics page, everything needed to deploy (`docs/DEPLOY.md`), the measured results (`docs/RESULTS.md`), the architecture and demo script, a README with screenshots, and the pitch deck (`docs/LeadOps_pitch.pptx`). A pre-deploy code and security review (23 Nov): dead code removed, a chat rate limit, a daily LLM call cap and safer IP, masking and link handling. 262 tests pass.
 - **Next (only the team can do these):** 30 to 50 real test sessions through tester links, then `ml/evaluate.py` and the Impact slide; the Neon, Render and Vercel accounts and the deploy (`docs/DEPLOY.md`); one check with a real LLM key; the 3-minute demo video and at least five rehearsals (`docs/DEMO_SCRIPT.md`).
+- **Waiting on the user:** whether the dashboard's WebSocket should stop sending the passcode in its URL (a contract change, see the 23 Nov entry).
 - **Blocked:** the LLM features haven't been tried with a real API key (the user hasn't approved spending it); template mode and the keyword rules work, and Claude's request shape matches the API reference.
 - **Code:** https://github.com/bansalabhay01-ui/Real_Estate (branch `main`)
+
+---
+
+## 2026-11-23 · bansalabhay01-ui · Pre-deploy code and security review
+
+**Done**
+- Read every line of the backend, AI, scoring, `ml/`, SDK and frontend, and ran ruff, vulture, bandit, pip-audit and npm audit. No known-vulnerable packages (71 Python, all npm) and no secrets in the code or the git history.
+- **Security fixes:**
+  - LLM cost: `LLM_DAILY_LIMIT` (default 1000 calls in any 24 hours, 0 = no limit) in `ai/llm_client.py`. Past it every caller falls back to its template, so the demo keeps working. Added to `backend/.env.example`.
+  - `POST /chat` allows 30 messages a minute per IP address and then returns 429 (`utils.RateLimit`, in memory). The chat widget explains the 429. Enquiries and events have no limit, on purpose: labelling spam is the product.
+  - Visitor IP (`utils.client_ip`): Render adds to `X-Forwarded-For` without clearing what the browser sent, so the first entry could be faked. Cloudflare's `CF-Connecting-IP` / `True-Client-IP` now come first. `X-Real-IP` is no longer trusted.
+  - `ai/privacy.py` masks phone numbers in any format before text reaches an LLM: dashes, brackets, landlines, Devanagari digits. Budgets and sizes are left alone.
+  - The follow-up `mailto:` link encodes the address (backend and `LeadBrief.jsx`), so a fake email like `a@b.in?bcc=x@y.in` can't add recipients.
+  - The SDK (1.3.1) drops a clicked link's query string and fragment, and keeps only the scheme of `mailto:`/`tel:` links. Enquiry forms send `page_url` without the query string.
+  - `frontend/vercel.json` sends `X-Frame-Options: DENY`, `nosniff`, a referrer policy and a permissions policy.
+- **Other fixes:** a lead brief no longer fails with a 500 if the visitor is erased during the LLM call. `ml/bots/run_bots.py` sends `DASHBOARD_PASSCODE` when it reads a bot's label. The cache-key SHA-1 calls are marked `usedforsecurity=False`.
+- **Removed:** the unused `db.get_db`, the unused `_MAX_BEFORE` / `_MAX_AFTER` patterns in `ai/extract.py`, an unused import in `ml/train.py` and an unneeded export in `Filters.jsx`. Out-of-date comments in `scoring/__init__.py`, `ai/rag.py` and `scoring/explain.py` were rewritten.
+- Checked: 262 tests pass (10 new: Cloudflare IP, the chat limit, the LLM cap, the masking), the frontend builds, and a live server run passed (no LLM key, throwaway database, passcode on).
+
+**Next**
+- The user decides on the dashboard WebSocket passcode (below), then the deploy.
+
+**Notes**
+- Left as it is, for the user to decide: the dashboard WebSocket sends its passcode as `?passcode=` in the URL, which uvicorn writes to Render's logs. Moving it to a header-like channel changes the WebSocket contract in `docs/CONTRACTS.md`, so it needs the team's OK.
+- The remaining bandit warnings are false alarms: random numbers for simulation, the bot runner's fixed command line, and URLs that come from the developer's own command line.
+- After deploying, check that the dashboard shows each visitor's real IP. If every IP looks the same, Render isn't passing on Cloudflare's header.
 
 ---
 

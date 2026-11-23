@@ -64,10 +64,9 @@ _RANGE = re.compile(rf"{_NUM}\s*{_UNIT}?\s*(?:-|to|se|and)\s*{_NUM}\s*{_UNIT}(?!
 # Full rupee amounts: "₹85,00,000", "rs 8500000", or Indian digit grouping "85,00,000".
 _RUPEES = re.compile(r"(?:₹|rs\.?|inr|rupees)\s*(\d{1,3}(?:,\d{2,3})+|\d{6,9})(?![\d,])|(?<![\d,])(\d{1,2}(?:,\d{2})+,\d{3})(?![\d,])")
 
+# Words that make an amount the lowest budget. Anything else ("under", "tak", "budget 90L", a bare amount) is the highest.
 _MIN_BEFORE = re.compile(r"(above|over|more than|min(?:imum)?|at ?least|starting(?: from)?|from|>)\s*$")
-_MAX_BEFORE = re.compile(r"(under|below|upto|up to|within|max(?:imum)?|less than|not more than|budget|around|about|approx(?:imately)?|<)\s*(?:is|of)?\s*$")
 _MIN_AFTER = re.compile(r"^\s*(se (?:upar|zyada|jyada|adhik)|or more|plus|\+|से ज़्यादा|से ऊपर|(?:ां)?पेक्षा (?:जास्त|वर))")
-_MAX_AFTER = re.compile(r"^\s*(tak|tk|ke andar|ke under|se kam|or less|max|तक|से कम)")
 
 _MONTHS = re.compile(r"(\d{1,2})\s*(?:months?|mnths?|mahine|mahino|mahina|महीने|महीनों|महीना|महिने|महिन्या|महिना)")
 _YEARS = re.compile(r"(\d|a|one|ek)\s*(?:years?|yrs?|saal|sal|साल|वर्ष)(?![a-z])")

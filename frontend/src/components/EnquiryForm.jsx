@@ -116,7 +116,7 @@ export default function EnquiryForm({ listing }) {
         honeypot: fields.website,
         form_fill_ms: startedAt.current ? Date.now() - startedAt.current : 0,
         client_ts: Date.now(),
-        page_url: window.location.href,
+        page_url: window.location.origin + window.location.pathname, // no query string: it can hold personal details
       });
       track("enquiry_submitted", { listing_id: listing.id });
       setAccepted(answer);

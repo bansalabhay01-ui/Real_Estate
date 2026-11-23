@@ -165,8 +165,12 @@ export default function ChatWidget() {
         const { listing_id, price_inr, down_payment_pct, rate_pct, years, emi_inr } = data.emi;
         track("emi_used", { listing_id, price_inr, down_payment_pct, rate_pct, years, emi: emi_inr, via: "assistant" });
       }
-    } catch {
-      setError("The assistant can't be reached right now. Try again in a moment.");
+    } catch (problem) {
+      setError(
+        problem.status === 429
+          ? "That's a lot of messages at once. Wait a minute, then try again."
+          : "The assistant can't be reached right now. Try again in a moment.",
+      );
     } finally {
       setSending(false);
     }

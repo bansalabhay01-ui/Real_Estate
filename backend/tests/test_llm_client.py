@@ -7,6 +7,7 @@ import httpx2
 import pytest
 
 from app.ai.llm_client import LLMClient, LLMError
+from app.utils import RateLimit
 
 
 def claude_wrapper(handler, model: str) -> LLMClient:
@@ -118,3 +119,19 @@ def test_json_from_models_without_a_schema_is_unwrapped():
     assert _json_object('Here you go: {"a": 1}', "gemini") == {"a": 1}
     with pytest.raises(LLMError):
         _json_object("[1, 2]", "groq")
+
+
+def test_past_the_daily_limit_callers_fall_back_to_templates():
+    sent = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        sent.append(request)
+        return reply(text='{"city": "Pune"}')
+
+    wrapper = claude_wrapper(handler, "claude-haiku-5-5")
+    wrapper._budget = RateLimit(2, 3600)
+    wrapper.generate("s", [{"role": "user", "content": "hi"}])
+    wrapper.generate_json("s", [{"role": "user", "content": "Pune mein"}], SCHEMA)
+    with pytest.raises(LLMError, match="LLM_DAILY_LIMIT"):
+        wrapper.generate("s", [{"role": "user", "content": "hi"}])
+    assert len(sent) == 2  # the third call never left the server

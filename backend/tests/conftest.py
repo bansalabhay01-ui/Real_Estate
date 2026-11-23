@@ -15,6 +15,7 @@ os.environ["LLM_PROVIDER"] = "none"
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
+from app.api.chat import MESSAGES_PER_IP  # noqa: E402
 from app.main import app  # noqa: E402
 
 
@@ -22,3 +23,9 @@ from app.main import app  # noqa: E402
 def client():
     with TestClient(app) as test_client:  # runs startup, which creates the tables
         yield test_client
+
+
+@pytest.fixture(autouse=True)
+def _fresh_chat_limit():
+    """Every request in the suite comes from the same test client, so each test starts with the chat limit unused."""
+    MESSAGES_PER_IP.clear()

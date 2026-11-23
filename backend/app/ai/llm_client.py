@@ -17,6 +17,7 @@ import anthropic
 import httpx
 
 from ..config import settings
+from ..utils import RateLimit
 
 log = logging.getLogger("leadops.llm")
 
@@ -45,6 +46,12 @@ class LLMClient:
         self.provider = self._pick_provider()
         self.model = settings.llm_model or DEFAULT_MODELS.get(self.provider or "", "")
         self._claude_client: anthropic.Anthropic | None = None
+        self._budget = RateLimit(settings.llm_daily_limit, 24 * 3600)
+
+    def _spend_one_call(self) -> None:
+        """Past LLM_DAILY_LIMIT calls in 24 hours, every caller falls back to its template until older calls age out."""
+        if not self._budget.allow("calls"):
+            raise LLMError(f"LLM_DAILY_LIMIT reached ({settings.llm_daily_limit} calls in 24 hours)")
 
     @staticmethod
     def _pick_provider() -> str | None:
@@ -68,14 +75,15 @@ class LLMClient:
         messages: [{"role": "user" | "assistant", "content": "..."}], oldest first, ending with the user.
         max_tokens applies to Gemini and Groq; Claude gets a generous cap because its thinking counts too.
         """
+        if self.provider is None:
+            raise LLMError("No LLM provider is configured")
+        self._spend_one_call()
         if self.provider == "anthropic":
             text = self._claude(system, messages)
         elif self.provider == "gemini":
             text = self._gemini(system, messages)
-        elif self.provider == "groq":
-            text = self._groq(system, messages, max_tokens)
         else:
-            raise LLMError("No LLM provider is configured")
+            text = self._groq(system, messages, max_tokens)
         text = text.strip()
         if not text:
             raise LLMError(f"{self.provider} returned an empty answer")
@@ -87,16 +95,17 @@ class LLMClient:
         Claude gets it as a structured output, so its answer always parses. Gemini and Groq get their JSON mode
         with the schema in the system prompt. Any failure, including JSON that doesn't parse, raises LLMError.
         """
+        if self.provider is None:
+            raise LLMError("No LLM provider is configured")
+        self._spend_one_call()
         if self.provider == "anthropic":
             text = self._claude(system, messages, json_schema=schema)
-        elif self.provider in ("gemini", "groq"):
+        else:
             described = f"{system}\n\nReply with only a JSON object that follows this JSON schema:\n{json.dumps(schema)}"
             if self.provider == "gemini":
                 text = self._gemini(described, messages, json_mode=True)
             else:
                 text = self._groq(described, messages, max_tokens, json_mode=True)
-        else:
-            raise LLMError("No LLM provider is configured")
         return _json_object(text, self.provider)
 
     # ---------------------------------------------------------------- Claude (Anthropic SDK)

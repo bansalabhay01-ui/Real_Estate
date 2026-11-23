@@ -1,6 +1,6 @@
 """Plain-language reasons: the rules that fired, the ML model's strongest factors and the biggest intent points.
 
-These are template sentences. Week 3 adds an LLM-written summary on top (every LLM call goes through llm_client.py).
+These are template sentences, so they cost nothing. The LLM-written lead brief is in ai/brief.py.
 """
 
 import math
@@ -138,7 +138,7 @@ def reasons_for(label: str, *, signals: list[Signal], check: HumanCheck, feature
 
 
 def summary_line(label: str, reasons: list[str]) -> str:
-    """"Hot: 3 visits over 2 days; checked the EMI on a ₹85 L home; ..." (the LLM writes a better one in Week 3)."""
+    """"Hot: 3 visits over 2 days; checked the EMI on a ₹85 L home; ..."."""
     if not reasons:
         return label
     parts = [reasons[0]] + [_lower_first(reason) for reason in reasons[1:3]]

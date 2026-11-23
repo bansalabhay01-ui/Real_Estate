@@ -19,6 +19,7 @@ With --api, each bot prints the label LeadOps gave it.
 
 import argparse
 import json
+import os
 import random
 import sys
 import time
@@ -153,8 +154,11 @@ BOTS = {"naive": naive_bot, "stealth": stealth_bot, "scraper": scraper_bot}
 
 
 def label_from(api: str, visitor_id: str) -> str:
+    # The visitor's label is on a dashboard route. Run from the dashboard, the bot inherits the backend's passcode.
+    passcode = os.environ.get("DASHBOARD_PASSCODE", "").strip()
+    request = urllib.request.Request(f"{api}/visitors/{visitor_id}", headers={"X-LeadOps-Passcode": passcode} if passcode else {})
     try:
-        with urllib.request.urlopen(f"{api}/visitors/{visitor_id}", timeout=10) as response:
+        with urllib.request.urlopen(request, timeout=10) as response:
             visitor = json.loads(response.read())["visitor"]
     except (urllib.error.URLError, TimeoutError, KeyError) as error:
         return f"(couldn't read its label: {error})"

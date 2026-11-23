@@ -136,7 +136,7 @@ export default function ContactCapture({ action, language = "en", onDone }) {
           message: action.message ?? "Asked for a call back",
           source: action.purpose === "offer" ? "assistant_offer" : "chat",
           client_ts: Date.now(),
-          page_url: window.location.href,
+          page_url: window.location.origin + window.location.pathname, // no query string: it can hold personal details
         });
         onDone(action.thanks ?? words.thanks);
       }

@@ -110,3 +110,18 @@ def test_smart_extract_keeps_one_budget_pair(monkeypatch):
 def test_smart_extract_falls_back_to_the_patterns(monkeypatch):
     monkeypatch.setattr(extract_module, "llm", FakeLLM(error=LLMError("timeout")))
     assert read_message("3BHK under 90L in Pune")[0]["budget_max"] == 9_000_000
+
+
+@pytest.mark.parametrize("number", ["9822012345", "+91 98220 12345", "987-654-3210", "(022) 2345 6789", "098220 12345", "९८२२०१२३४५"])
+def test_phone_numbers_are_masked_however_they_are_written(number):
+    from app.ai.privacy import mask_pii
+
+    masked = mask_pii(f"call me on {number} please")
+    assert "[phone]" in masked and not any(character.isdigit() for character in masked)
+
+
+def test_masking_leaves_budgets_and_sizes_alone():
+    from app.ai.privacy import mask_pii
+
+    text = "3BHK, 1450 sqft, 80-90 lakh or ₹85,00,000, possession 2026-11"
+    assert mask_pii(text) == text

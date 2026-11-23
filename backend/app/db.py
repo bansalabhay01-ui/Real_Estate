@@ -1,11 +1,9 @@
 """Database engine and sessions: SQLite while developing, Postgres in production (set DATABASE_URL)."""
 
-from collections.abc import Iterator
-
 import logging
 
 from sqlalchemy import create_engine, event, inspect, text
-from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from .config import settings
 
@@ -64,9 +62,3 @@ def _add_missing_columns() -> None:
             for index in table.indexes:
                 if names & {column.name for column in index.columns}:
                     index.create(connection, checkfirst=True)
-
-
-def get_db() -> Iterator[Session]:
-    """FastAPI dependency: one database session per request."""
-    with SessionLocal() as db:
-        yield db
