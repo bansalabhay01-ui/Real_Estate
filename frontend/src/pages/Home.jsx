@@ -72,6 +72,7 @@ export default function Home() {
   const filtersTouched = useRef(false);
 
   useEffect(() => {
+    document.title = "LeadOps Realty (demo)";
     getListings()
       .then(setListings)
       .catch(() => setFailed(true));

@@ -56,7 +56,7 @@ export default function Property() {
       <div className="mx-auto max-w-6xl px-4 py-16">
         <h1 className="font-wide text-2xl font-semibold">We couldn&apos;t find home {id}.</h1>
         <p className="mt-2 text-muted">It may have been sold or taken off the site.</p>
-        <Link to="/" className="mt-6 inline-block font-semibold text-blueprint underline underline-offset-2">
+        <Link to="/demo" className="mt-6 inline-block font-semibold text-blueprint underline underline-offset-2">
           See all homes
         </Link>
       </div>
@@ -70,7 +70,7 @@ export default function Property() {
 
   return (
     <article className="mx-auto max-w-6xl px-4 py-8">
-      <Link to="/" className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-soft hover:text-ink">
+      <Link to="/demo" className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-soft hover:text-ink">
         <IconBack />
         All homes
       </Link>

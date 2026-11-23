@@ -17,13 +17,13 @@ export default function SiteLayout() {
     <div className="flex min-h-dvh flex-col">
       <header className="border-b border-line bg-white">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
-          <Link to="/" className="flex items-center gap-2.5">
+          <Link to="/demo" className="flex items-center gap-2.5">
             <PlanMark />
             <span className="whitespace-nowrap font-extra-wide text-lg font-bold">LeadOps Realty</span>
             <span className="rounded-full border border-line px-2 text-xs font-medium text-muted">Demo</span>
           </Link>
           <nav aria-label="Main" className="flex items-center gap-5 text-sm font-medium">
-            <NavLink to="/" end className={navClass}>
+            <NavLink to="/demo" end className={navClass}>
               Homes
             </NavLink>
             <NavLink to="/dashboard" className={navClass}>

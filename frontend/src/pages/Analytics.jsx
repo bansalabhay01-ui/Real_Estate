@@ -233,7 +233,7 @@ function AnalyticsPage() {
             <Link to="/dashboard" className={link}>
               Sales dashboard
             </Link>
-            <Link to="/" className={link}>
+            <Link to="/demo" className={link}>
               Open the demo site
             </Link>
           </nav>

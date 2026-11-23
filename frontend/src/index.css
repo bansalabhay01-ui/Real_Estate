@@ -201,6 +201,20 @@
   animation: row-in 0.5s var(--ease-out-soft) both;
 }
 
+/* The active step of "How it works" fills its bar over the time it stays on screen. */
+@keyframes step-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+.step-fill {
+  transform-origin: left;
+  animation: step-fill var(--step-ms, 5.5s) linear both;
+}
+
 /* The hero headline rises in once, line by line: the page's one orchestrated moment. */
 @keyframes rise {
   from {
@@ -258,6 +272,7 @@
   .label-in,
   .row-in,
   .rise,
+  .step-fill,
   .marquee-track {
     animation: none;
     stroke-dashoffset: 0;

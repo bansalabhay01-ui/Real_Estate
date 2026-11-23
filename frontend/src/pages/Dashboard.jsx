@@ -97,7 +97,7 @@ function VisitorsTable({ visitors, filter, loading, failed, updatedAt, selectedI
         <p className="font-medium">No visitors yet.</p>
         <p className="mt-1 text-muted">
           Open the{" "}
-          <Link to="/" className="font-medium text-blueprint underline underline-offset-2">
+          <Link to="/demo" className="font-medium text-blueprint underline underline-offset-2">
             demo site
           </Link>{" "}
           in another tab, or send simulated traffic with{" "}
@@ -401,7 +401,7 @@ function SalesDashboard() {
             <Link to="/dashboard/analytics" className="font-medium text-white/80 underline-offset-4 hover:text-white hover:underline">
               Analytics
             </Link>
-            <Link to="/" className="font-medium text-white/80 underline-offset-4 hover:text-white hover:underline">
+            <Link to="/demo" className="font-medium text-white/80 underline-offset-4 hover:text-white hover:underline">
               Open the demo site
             </Link>
           </div>
