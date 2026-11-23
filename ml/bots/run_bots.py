@@ -12,7 +12,7 @@ Bots:
            and skips the hidden field: only its behaviour gives it away
   scraper  opens every listing in a few seconds and copies the prices
 
-Every run opens the site through a lo_test=bot tester link, so its visits join the real test set (ml/train.py).
+Every run opens the property site (/demo) through a lo_test=bot tester link, so its visits join the real test set (ml/train.py).
 They drive the Edge or Chrome already installed; elsewhere run `python -m playwright install chromium` once.
 With --api, each bot prints the label LeadOps gave it.
 """
@@ -35,7 +35,7 @@ HIDE_WEBDRIVER = "Object.defineProperty(Navigator.prototype, 'webdriver', { get:
 
 
 def tester_link(site: str, kind: str) -> str:
-    return f"{site}/?lo_test=bot&lo_tester=bot-{kind}"
+    return f"{site}/demo?lo_test=bot&lo_tester=bot-{kind}"
 
 
 def pause(rng: random.Random, low: float, high: float) -> None:

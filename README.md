@@ -182,13 +182,14 @@ their browser as a test session. Scoring ignores the mark; `ml/train.py` uses it
 
 | Link | Use it for |
 |---|---|
-| `/?lo_test=genuine&lo_tester=t01` | browsing as a real buyer |
-| `/?lo_test=junk&lo_tester=t02` | playing a junk lead on purpose: a broker asking for inventory, a fake number |
-| `/?lo_test=bot&lo_tester=bot-naive` | bots (the Playwright bots add this themselves) |
-| `/?lo_test=off` | clearing the mark from a browser |
+| `/demo?lo_test=genuine&lo_tester=t01` | browsing as a real buyer |
+| `/demo?lo_test=junk&lo_tester=t02` | playing a junk lead on purpose: a broker asking for inventory, a fake number |
+| `/demo?lo_test=bot&lo_tester=bot-naive` | bots (the Playwright bots add this themselves) |
+| `/demo?lo_test=off` | clearing the mark from a browser |
 
 Give each tester a code (`t01`, `t02`, ...) rather than their name. The browser remembers the mark, so a repeat
-visit from the same device counts too. The dashboard shows a "Test" chip on these visitors.
+visit from the same device counts too. The dashboard shows a "Test" chip on these visitors. Links shared before
+the front page moved the property site to `/demo` (`/?lo_test=...`) still work: they forward there.
 
 **What to tell testers**
 
@@ -208,7 +209,7 @@ visit from the same device counts too. The dashboard shows a "Test" chip on thes
 4. Start the site the same way, from `frontend/`: `npm run dev -- --host`.
 5. When Windows asks, allow Python and Node on private networks. If devices still can't connect, set the Wi-Fi
    network to Private (Settings > Network & internet).
-6. Share `http://192.168.1.23:5173/?lo_test=genuine&lo_tester=t01`, with your laptop's address. The site finds the
+6. Share `http://192.168.1.23:5173/demo?lo_test=genuine&lo_tester=t01`, with your laptop's address. The site finds the
    API on the same laptop by itself.
 
 **Measuring the result**

@@ -58,12 +58,12 @@ export default function EmiCalculator({ listing }) {
   };
 
   return (
-    <section aria-labelledby="emi-heading" className="rounded-lg border border-line bg-white p-5">
-      <h2 id="emi-heading" className="font-wide text-lg font-semibold">
+    <section aria-labelledby="emi-heading" className="rounded-[22px] border border-line bg-white p-6">
+      <h2 id="emi-heading" className="text-xl font-medium tracking-[-0.02em]">
         EMI estimate
       </h2>
       <p className="mt-3">
-        <span className="tabular text-3xl font-semibold">{formatRupees(monthly)}</span>
+        <span className="tabular text-4xl font-medium tracking-[-0.04em]">{formatRupees(monthly)}</span>
         <span className="text-muted"> a month</span>
       </p>
       <p className="mt-1 text-sm text-muted">

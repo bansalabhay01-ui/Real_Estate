@@ -35,6 +35,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 LISTINGS = json.loads((ROOT / "backend" / "data" / "listings.json").read_text(encoding="utf-8"))
 SITE = "leadops-realty-demo"
+HOME = "/demo"  # the property site's homes page (the LeadOps front page at / is never tracked)
 DAY_MS = 86_400_000
 
 UA_DESKTOP = [
@@ -246,7 +247,7 @@ class Visit:
         """A message to the property assistant."""
         self.wait(5, 25)
         self.chat.append({"session_id": self.session_id, "text": text, "ts": self.clock})
-        self.add("chat_message", self.events[-1]["path"] if self.events else "/", {"length": len(text)})
+        self.add("chat_message", self.events[-1]["path"] if self.events else HOME, {"length": len(text)})
 
 
 # ---------------------------------------------------------------- building blocks
@@ -357,7 +358,7 @@ def make_bot(rng: random.Random) -> Visitor:
     visitor = Visitor(rng, "bot", kind, user_agent=ua, context=bot_context(rng))
     visit = visitor.visit(rng.choice(BOT_IPS) if rng.random() < 0.6 else proxy_ip(rng))
     if kind == "scraper":
-        visit.robot_page("/", rng.uniform(0.2, 1.0))
+        visit.robot_page(HOME, rng.uniform(0.2, 1.0))
         scroll = rng.random() < 0.3
         for home in rng.sample(LISTINGS, rng.randint(8, 18)):
             visit.wait(0.1, 0.8)
@@ -448,7 +449,7 @@ def make_junk(rng: random.Random) -> Visitor:
                      message=message, fill_ms=rng.randint(4_000, 15_000), keys=typed_keys(rng, message))
     else:  # fake_details: a person, but not a real enquiry
         visit = visitor.visit(human_ip(rng))
-        visit.human_page("/", rng.uniform(4, 15))
+        visit.human_page(HOME, rng.uniform(4, 15))
         visit.human_page(path, rng.uniform(8, 30))
         visit.submit(path, home["id"], name=rng.choice(JUNK_NAMES), phone_number=rng.choice(FAKE_PHONES),
                      email=rng.choice(JUNK_EMAILS), message="", fill_ms=rng.randint(5_000, 20_000), keys=rng.randint(8, 30))
@@ -495,7 +496,7 @@ def make_genuine(rng: random.Random) -> Visitor:
         visit.add("filter_used", path, {"city": city, "bhk": bhk, "max_price": None})
 
     visit = visitor.visit(ip)
-    visit.human_page("/", rng.uniform(10, 40), extra=use_filters)
+    visit.human_page(HOME, rng.uniform(10, 40), extra=use_filters)
 
     if kind == "casual":
         for home in rng.sample(homes, min(len(homes), rng.randint(1, 2))):

@@ -13,8 +13,8 @@ function Choice({ pressed, onClick, children }) {
       type="button"
       aria-pressed={pressed}
       onClick={onClick}
-      className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${
-        pressed ? "border-ink bg-ink text-white" : "border-line bg-white text-ink hover:border-ink"
+      className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+        pressed ? "border-night bg-night text-white" : "border-line bg-white text-ink hover:border-ink/40"
       }`}
     >
       {children}
@@ -28,7 +28,7 @@ export default function Filters({ filters, onChange }) {
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-end lg:gap-8">
       <fieldset className="flex flex-col gap-2">
-        <legend className="mb-2 text-sm font-semibold text-ink-soft">City</legend>
+        <legend className="mb-2 font-mono text-[13px] text-muted">City</legend>
         <div className="flex flex-wrap gap-2">
           <Choice pressed={!filters.city} onClick={() => set("city", "")}>
             All cities
@@ -42,7 +42,7 @@ export default function Filters({ filters, onChange }) {
       </fieldset>
 
       <fieldset className="flex flex-col gap-2">
-        <legend className="mb-2 text-sm font-semibold text-ink-soft">Bedrooms</legend>
+        <legend className="mb-2 font-mono text-[13px] text-muted">Bedrooms</legend>
         <div className="flex flex-wrap gap-2">
           <Choice pressed={!filters.bhk} onClick={() => set("bhk", 0)}>
             Any
@@ -55,12 +55,12 @@ export default function Filters({ filters, onChange }) {
         </div>
       </fieldset>
 
-      <label className="flex flex-col gap-2 text-sm font-semibold text-ink-soft">
+      <label className="flex flex-col gap-2 font-mono text-[13px] text-muted">
         Budget
         <select
           value={filters.maxPrice}
           onChange={(event) => set("maxPrice", Number(event.target.value))}
-          className="rounded-md border border-line bg-white px-3 py-2 text-sm font-medium text-ink"
+          className="rounded-full border border-line bg-white px-4 py-2 font-sans text-sm font-medium text-ink"
         >
           <option value={0}>Any budget</option>
           {BUDGETS.map(([value, label]) => (

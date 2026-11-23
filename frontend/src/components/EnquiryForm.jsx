@@ -4,7 +4,7 @@ import { track } from "../lib/leadops";
 import { IconCheck } from "./icons";
 
 const inputClass =
-  "w-full rounded-md border border-line bg-white px-3 py-2 text-base text-ink placeholder:text-muted focus:border-blueprint";
+  "w-full rounded-[12px] border border-line bg-white px-3.5 py-2.5 text-base text-ink placeholder:text-muted focus:border-blueprint";
 
 function Field({ label, children }) {
   return (
@@ -65,7 +65,7 @@ function PhoneCheck({ leadId, otp }) {
         <button
           type="submit"
           disabled={state === "checking"}
-          className="shrink-0 rounded-md bg-ink px-3 py-2 text-sm font-semibold text-white hover:bg-ink-soft disabled:opacity-60"
+          className="shrink-0 rounded-full bg-night px-4 py-2 text-sm font-medium text-white hover:bg-night-2 disabled:opacity-60"
         >
           {state === "checking" ? "Checking..." : "Verify"}
         </button>
@@ -75,7 +75,7 @@ function PhoneCheck({ leadId, otp }) {
           That code isn&apos;t right. {triesLeft} {triesLeft === 1 ? "try" : "tries"} left.
         </p>
       )}
-      <p className="mt-2 rounded bg-concrete px-2.5 py-1.5 text-xs text-ink-soft">
+      <p className="mt-2 rounded-[10px] bg-concrete px-3 py-2 text-xs text-ink-soft">
         Demo only: no SMS is sent. Your code is <span className="tabular font-semibold text-ink">{otp.demo_code}</span>.
       </p>
     </form>
@@ -128,8 +128,8 @@ export default function EnquiryForm({ listing }) {
 
   if (status === "sent") {
     return (
-      <section aria-live="polite" className="rounded-lg border border-line bg-white p-5">
-        <p className="flex items-center gap-2 font-wide text-lg font-semibold">
+      <section aria-live="polite" className="rounded-[22px] border border-line bg-white p-6">
+        <p className="flex items-center gap-2 text-xl font-medium tracking-[-0.02em]">
           <IconCheck className="size-5 text-ok" />
           Enquiry sent
         </p>
@@ -142,8 +142,8 @@ export default function EnquiryForm({ listing }) {
   }
 
   return (
-    <section id="enquiry" aria-labelledby={headingId} className="rounded-lg border border-line bg-white p-5">
-      <h2 id={headingId} className="font-wide text-lg font-semibold">
+    <section id="enquiry" aria-labelledby={headingId} className="scroll-mt-24 rounded-[22px] border border-line bg-white p-6">
+      <h2 id={headingId} className="text-xl font-medium tracking-[-0.02em]">
         Talk to the sales team
       </h2>
       <p className="mt-1 text-sm text-muted">We&apos;ll call you back, usually within a day.</p>
@@ -193,7 +193,7 @@ export default function EnquiryForm({ listing }) {
         <button
           type="submit"
           disabled={status === "sending"}
-          className="mt-1 rounded-md bg-marigold px-4 py-2.5 font-semibold text-ink transition-colors hover:bg-[#e09500] disabled:opacity-60"
+          className="mt-1 rounded-full bg-marigold px-5 py-3 font-medium text-night transition-colors hover:bg-marigold-deep disabled:opacity-60"
         >
           {status === "sending" ? "Sending..." : "Send enquiry"}
         </button>

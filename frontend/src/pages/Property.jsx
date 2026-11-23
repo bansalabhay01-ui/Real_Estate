@@ -5,6 +5,7 @@ import EnquiryForm from "../components/EnquiryForm";
 import FloorPlan from "../components/FloorPlan";
 import { IconBack, IconDownload } from "../components/icons";
 import StatusBadge from "../components/StatusBadge";
+import { Button, Eyebrow, Rule } from "../components/ui";
 import { getListing } from "../lib/api";
 import { formatArea, formatPrice } from "../lib/format";
 import { track } from "../lib/leadops";
@@ -19,10 +20,22 @@ function downloadSvg(svg, filename) {
 
 function Fact({ label, value }) {
   return (
-    <div className="flex flex-col">
-      <dt className="text-sm text-muted">{label}</dt>
-      <dd className="font-semibold">{value}</dd>
+    <div className="flex flex-col gap-0.5">
+      <dt className="font-mono text-[12px] text-muted">{label}</dt>
+      <dd className="font-medium">{value}</dd>
     </div>
+  );
+}
+
+function Part({ id, title, children }) {
+  return (
+    <section aria-labelledby={id}>
+      <Rule />
+      <h2 id={id} className="text-title mt-5">
+        {title}
+      </h2>
+      <div className="mt-4">{children}</div>
+    </section>
   );
 }
 
@@ -53,8 +66,8 @@ export default function Property() {
 
   if (state === "missing") {
     return (
-      <div className="mx-auto max-w-6xl px-4 py-16">
-        <h1 className="font-wide text-2xl font-semibold">We couldn&apos;t find home {id}.</h1>
+      <div className="mx-auto max-w-[1224px] px-5 pb-32 pt-16 sm:px-8">
+        <h1 className="text-title">We couldn&apos;t find home {id}.</h1>
         <p className="mt-2 text-muted">It may have been sold or taken off the site.</p>
         <Link to="/demo" className="mt-6 inline-block font-semibold text-blueprint underline underline-offset-2">
           See all homes
@@ -63,36 +76,36 @@ export default function Property() {
     );
   }
   if (state === "loading" || !listing) {
-    return <p className="mx-auto max-w-6xl px-4 py-16 text-muted">Loading the home...</p>;
+    return <p className="mx-auto max-w-[1224px] px-5 pb-32 pt-16 text-muted sm:px-8">Loading the home...</p>;
   }
 
   const filename = `${listing.project} ${listing.bhk}BHK floor plan.svg`.replace(/[^\w .-]/g, "");
 
   return (
-    <article className="mx-auto max-w-6xl px-4 py-8">
-      <Link to="/demo" className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-soft hover:text-ink">
+    <article className="mx-auto max-w-[1224px] px-5 pb-36 pt-8 sm:px-8">
+      <Link
+        to="/demo"
+        className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-1.5 text-sm font-medium text-ink-soft hover:text-ink"
+      >
         <IconBack />
         All homes
       </Link>
 
-      <div className="mt-6 grid gap-10 lg:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="flex flex-col gap-10">
+      <div className="mt-8 grid gap-12 lg:grid-cols-[minmax(0,1fr)_400px]">
+        <div className="flex flex-col gap-14">
           <header>
-            <h1 className="font-extra-wide text-4xl font-bold tracking-tight sm:text-5xl">{listing.project}</h1>
-            <p className="mt-2 text-lg text-ink-soft">
+            <Eyebrow className="text-muted">
               {listing.locality}, {listing.city}
-            </p>
-            <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-3">
-              <p className="tabular text-3xl font-semibold">{formatPrice(listing.price_inr)}</p>
+            </Eyebrow>
+            <h1 className="text-section mt-3">{listing.project}</h1>
+            <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3">
+              <p className="tabular text-3xl font-medium tracking-[-0.03em]">{formatPrice(listing.price_inr)}</p>
               <StatusBadge listing={listing} className="border border-line" />
-              <a
-                href="#enquiry"
-                className="rounded-md bg-marigold px-4 py-2 text-sm font-semibold text-ink hover:bg-[#e09500] lg:hidden"
-              >
+              <Button href="#enquiry" tone="marigold" size="sm" className="lg:hidden">
                 Send an enquiry
-              </a>
+              </Button>
             </div>
-            <dl className="mt-6 grid grid-cols-2 gap-x-6 gap-y-4 rounded-lg border border-line bg-white p-5 sm:grid-cols-3">
+            <dl className="mt-8 grid grid-cols-2 gap-x-6 gap-y-5 rounded-[20px] border border-line bg-white p-6 sm:grid-cols-3">
               <Fact label="Bedrooms" value={`${listing.bhk} BHK`} />
               <Fact label="Area" value={formatArea(listing.area_sqft)} />
               <Fact label="Type" value={listing.property_type} />
@@ -103,61 +116,56 @@ export default function Property() {
           </header>
 
           <section aria-labelledby="plan-heading">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 id="plan-heading" className="font-wide text-xl font-semibold">
+            <Rule />
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+              <h2 id="plan-heading" className="text-title">
                 Floor plan
               </h2>
-              <button
-                type="button"
+              <Button
+                tone="outline"
+                size="sm"
                 onClick={() => {
                   downloadSvg(planRef.current, filename);
                   track("floorplan_download", { listing_id: listing.id, bhk: listing.bhk });
                 }}
-                className="inline-flex items-center gap-2 rounded-md border border-ink px-3 py-2 text-sm font-semibold hover:bg-ink hover:text-white"
               >
                 <IconDownload />
                 Download floor plan
-              </button>
+              </Button>
             </div>
-            <div className="mt-4 overflow-hidden rounded-lg bg-blueprint">
+            <div className="mt-5 overflow-hidden rounded-[22px] bg-blueprint">
               <FloorPlan ref={planRef} bhk={listing.bhk} area={listing.area_sqft} className="block w-full" />
             </div>
-            <p className="mt-2 text-sm text-muted">Indicative layout. Room sizes are approximate.</p>
+            <p className="mt-3 text-sm text-muted">Indicative layout. Room sizes are approximate.</p>
           </section>
 
-          <section aria-labelledby="highlights-heading">
-            <h2 id="highlights-heading" className="font-wide text-xl font-semibold">
-              Why people pick it
-            </h2>
-            <ul className="mt-3 list-disc space-y-1.5 pl-5 text-ink-soft">
+          <Part id="highlights-heading" title="Why people pick it">
+            <ul className="flex flex-col gap-2 text-ink-soft">
               {listing.highlights.map((highlight) => (
-                <li key={highlight}>{highlight}</li>
+                <li key={highlight} className="flex gap-2.5">
+                  <span className="mt-2.5 size-1.5 shrink-0 rotate-45 bg-blueprint" aria-hidden="true" />
+                  {highlight}
+                </li>
               ))}
             </ul>
-          </section>
+          </Part>
 
-          <section aria-labelledby="amenities-heading">
-            <h2 id="amenities-heading" className="font-wide text-xl font-semibold">
-              Amenities
-            </h2>
-            <ul className="mt-3 flex flex-wrap gap-2">
+          <Part id="amenities-heading" title="Amenities">
+            <ul className="flex flex-wrap gap-2">
               {listing.amenities.map((amenity) => (
-                <li key={amenity} className="rounded-full border border-line bg-white px-3 py-1 text-sm">
+                <li key={amenity} className="rounded-full border border-line bg-white px-3.5 py-1.5 text-sm">
                   {amenity}
                 </li>
               ))}
             </ul>
-          </section>
+          </Part>
 
-          <section aria-labelledby="about-heading">
-            <h2 id="about-heading" className="font-wide text-xl font-semibold">
-              About this home
-            </h2>
-            <p className="mt-3 max-w-prose text-ink-soft">{listing.description}</p>
-          </section>
+          <Part id="about-heading" title="About this home">
+            <p className="max-w-prose text-ink-soft">{listing.description}</p>
+          </Part>
         </div>
 
-        <aside className="flex flex-col gap-6 lg:sticky lg:top-6 lg:self-start">
+        <aside className="flex flex-col gap-5 lg:sticky lg:top-24 lg:self-start">
           <EmiCalculator listing={listing} />
           <EnquiryForm key={listing.id} listing={listing} />
         </aside>

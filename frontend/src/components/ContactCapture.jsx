@@ -56,7 +56,7 @@ const WORDS = {
   },
 };
 
-const fieldClass = "w-full rounded-md border border-line bg-white px-2.5 py-1.5 text-base text-ink focus:border-blueprint";
+const fieldClass = "w-full rounded-[10px] border border-line bg-white px-3 py-2 text-base text-ink focus:border-blueprint";
 
 function isoDay(day) {
   const month = String(day.getMonth() + 1).padStart(2, "0");
@@ -147,7 +147,7 @@ export default function ContactCapture({ action, language = "en", onDone }) {
   }
 
   return (
-    <form onSubmit={submit} className="relative flex w-full flex-col gap-2.5 rounded-md border border-line bg-white p-3 text-sm">
+    <form onSubmit={submit} className="relative flex w-full flex-col gap-2.5 rounded-[16px] border border-line bg-white p-3.5 text-sm">
       {forVisit && (
         <div className="grid grid-cols-2 gap-2">
           <label className="flex flex-col gap-1 font-medium text-ink-soft">
@@ -213,7 +213,7 @@ export default function ContactCapture({ action, language = "en", onDone }) {
       <button
         type="submit"
         disabled={status === "sending"}
-        className="rounded-md bg-marigold px-3 py-2 font-semibold text-ink hover:bg-[#e09500] disabled:opacity-60"
+        className="rounded-full bg-marigold px-4 py-2.5 font-medium text-night hover:bg-marigold-deep disabled:opacity-60"
       >
         {status === "sending" ? words.sending : (action.cta ?? (forVisit ? words.book : words.send))}
       </button>

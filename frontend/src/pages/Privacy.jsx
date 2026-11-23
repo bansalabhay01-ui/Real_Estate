@@ -5,7 +5,7 @@ import { answerConsent, consentChoice, visitorIds } from "../lib/leadops";
 function Part({ title, children }) {
   return (
     <section>
-      <h2 className="font-wide text-xl font-semibold">{title}</h2>
+      <h2 className="text-title">{title}</h2>
       <div className="mt-2 flex flex-col gap-2 text-ink-soft">{children}</div>
     </section>
   );
@@ -49,12 +49,12 @@ export default function Privacy() {
   }
 
   const status = { granted: "You have agreed to tracking.", denied: "You have declined tracking." }[choice] ?? "You haven't chosen yet.";
-  const button = "rounded-md border border-ink px-4 py-2 text-sm font-semibold hover:bg-ink hover:text-white disabled:border-line disabled:text-muted disabled:hover:bg-transparent";
+  const button = "rounded-full border border-ink px-5 py-2 text-sm font-medium hover:bg-night hover:text-white disabled:border-line disabled:text-muted disabled:hover:bg-transparent";
 
   return (
-    <article className="mx-auto flex max-w-3xl flex-col gap-8 px-4 py-10">
+    <article className="mx-auto flex max-w-3xl flex-col gap-10 px-5 pb-36 pt-14 sm:px-8">
       <header>
-        <h1 className="font-extra-wide text-4xl font-bold tracking-tight">Privacy notice</h1>
+        <h1 className="text-section">Privacy notice</h1>
         <p className="mt-2 text-ink-soft">LeadOps Realty is a demo site. This notice shows how a real site using LeadOps treats your data under India&apos;s DPDP Act 2023.</p>
       </header>
 

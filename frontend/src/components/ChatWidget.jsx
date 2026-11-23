@@ -20,7 +20,7 @@ export const openChat = () => window.dispatchEvent(new Event("leadops:open-chat"
 
 function EmiCard({ emi }) {
   return (
-    <dl className="w-full rounded-md border border-line p-3 text-sm">
+    <dl className="w-full rounded-[14px] border border-line p-3 text-sm">
       <div className="flex items-baseline justify-between gap-3">
         <dt className="font-medium text-ink-soft">EMI a month</dt>
         <dd className="tabular text-lg font-semibold">{formatRupees(emi.emi_inr)}</dd>
@@ -44,8 +44,8 @@ function Message({ message, language, onFormDone }) {
   return (
     <li className={`flex flex-col gap-2 ${mine ? "items-end" : "items-start"}`}>
       <p
-        className={`max-w-[85%] whitespace-pre-line rounded-lg px-3 py-2 text-sm ${
-          mine ? "bg-blueprint text-white" : "bg-concrete text-ink"
+        className={`max-w-[85%] whitespace-pre-line rounded-[16px] px-3.5 py-2.5 text-sm ${
+          mine ? "rounded-br-md bg-blueprint text-white" : "rounded-bl-md bg-concrete text-ink"
         }`}
       >
         {message.text}
@@ -56,7 +56,7 @@ function Message({ message, language, onFormDone }) {
             <li key={home.id}>
               <Link
                 to={`/property/${home.id}`}
-                className="flex items-baseline justify-between gap-3 rounded-md border border-line px-3 py-2 text-sm hover:border-blueprint"
+                className="flex items-baseline justify-between gap-3 rounded-[12px] border border-line px-3 py-2 text-sm hover:border-blueprint"
               >
                 <span>
                   <span className="font-semibold">{home.project}</span>
@@ -190,7 +190,7 @@ export default function ChatWidget() {
         {offer && (
           <aside
             aria-label="An offer from the property assistant"
-            className="fixed bottom-20 right-4 z-40 w-[min(340px,calc(100vw-2rem))] rounded-xl border border-line bg-white p-4 shadow-2xl shadow-ink/20"
+            className="fixed bottom-20 right-4 z-40 w-[min(340px,calc(100vw-2rem))] rounded-[20px] border border-line bg-white p-4 shadow-2xl shadow-ink/20"
           >
             <p className="flex items-center gap-1.5 text-xs font-semibold text-blueprint">
               <IconChat className="size-4" />
@@ -201,11 +201,11 @@ export default function ChatWidget() {
               <button
                 type="button"
                 onClick={() => answerOffer(true)}
-                className="rounded-md bg-marigold px-3 py-2 text-sm font-semibold text-ink hover:bg-[#e09500]"
+                className="rounded-full bg-marigold px-4 py-2 text-sm font-medium text-night hover:bg-marigold-deep"
               >
                 {offer.cta}
               </button>
-              <button type="button" onClick={() => answerOffer(false)} className="rounded-md border border-line px-3 py-2 text-sm hover:bg-concrete">
+              <button type="button" onClick={() => answerOffer(false)} className="rounded-full border border-line px-4 py-2 text-sm hover:bg-concrete">
                 {NO_THANKS[offer.language] ?? NO_THANKS.en}
               </button>
             </div>
@@ -214,7 +214,7 @@ export default function ChatWidget() {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="fixed bottom-4 right-4 z-40 flex items-center gap-2 rounded-full bg-marigold px-5 py-3 font-semibold text-ink shadow-lg shadow-ink/15 hover:bg-[#e09500]"
+          className="fixed bottom-4 right-4 z-40 flex items-center gap-2 rounded-full bg-marigold px-5 py-3 font-medium text-night shadow-lg shadow-ink/15 hover:bg-marigold-deep"
         >
           <IconChat className="size-5" />
           Ask about homes
@@ -228,11 +228,11 @@ export default function ChatWidget() {
       role="dialog"
       aria-label="Property assistant"
       onKeyDown={(event) => event.key === "Escape" && setOpen(false)}
-      className="fixed bottom-4 right-4 z-40 flex h-[min(560px,calc(100dvh-2rem))] w-[min(400px,calc(100vw-2rem))] flex-col overflow-hidden rounded-xl border border-line bg-white shadow-2xl shadow-ink/20"
+      className="fixed bottom-4 right-4 z-40 flex h-[min(560px,calc(100dvh-2rem))] w-[min(400px,calc(100vw-2rem))] flex-col overflow-hidden rounded-[22px] border border-line bg-white shadow-2xl shadow-ink/20"
     >
-      <header className="flex items-center justify-between bg-ink px-4 py-3 text-white">
+      <header data-tone="dark" className="flex items-center justify-between bg-night px-4 py-3 text-white">
         <div>
-          <h2 className="font-wide font-semibold">Property assistant</h2>
+          <h2 className="font-medium tracking-[-0.01em]">Property assistant</h2>
           <p className="text-xs text-white/70">Answers from the homes on this site</p>
         </div>
         <button type="button" onClick={() => setOpen(false)} className="rounded p-1 hover:bg-white/10" aria-label="Close the assistant">
@@ -291,12 +291,12 @@ export default function ChatWidget() {
           onChange={(event) => setDraft(event.target.value)}
           maxLength={1000}
           placeholder="3BHK under 90L in Pune"
-          className="min-w-0 flex-1 rounded-md border border-line px-3 py-2 text-base focus:border-blueprint"
+          className="min-w-0 flex-1 rounded-full border border-line px-4 py-2 text-base focus:border-blueprint"
         />
         <button
           type="submit"
           disabled={sending || !draft.trim()}
-          className="flex items-center gap-1.5 rounded-md bg-ink px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded-full bg-night px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
           <IconSend className="size-4" />
           Send

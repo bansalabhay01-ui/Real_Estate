@@ -12,8 +12,8 @@ const Analytics = lazy(() => import("./pages/Analytics"));
 
 function NotFound() {
   return (
-    <div className="mx-auto max-w-6xl px-4 py-16">
-      <h1 className="font-wide text-2xl font-semibold">This page doesn&apos;t exist.</h1>
+    <div className="mx-auto max-w-[1224px] px-5 pb-36 pt-16 sm:px-8">
+      <h1 className="text-title">This page doesn&apos;t exist.</h1>
       <Link to="/demo" className="mt-4 inline-block font-semibold text-blueprint underline underline-offset-2">
         See all homes
       </Link>
